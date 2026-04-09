@@ -1,0 +1,24 @@
+{
+  "name": "aura-os-backend-node",
+  "version": "1.0.0",
+  "description": "AuraOS Node.js backend - MongoDB state, GenAI orchestration",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.21.0",
+    "@langchain/core": "^0.3.0",
+    "@langchain/groq": "^0.1.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "helmet": "^7.1.0",
+    "mongoose": "^8.5.0",
+    "morgan": "^1.10.0",
+    "uuid": "^10.0.0",
+    "zod": "^3.23.8"
+  }
+}

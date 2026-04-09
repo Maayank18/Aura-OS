@@ -1,0 +1,15 @@
+{
+  "name": "aura-os-root",
+  "version": "1.0.0",
+  "description": "AuraOS monorepo root – Vihaan DTU 9.0 Hackathon",
+  "private": true,
+  "scripts": {
+    "install:all": "npm i --prefix backend-node && npm i --prefix frontend",
+    "dev": "npx concurrently --names \"NODE,VITE\" --prefix-colors \"magenta,cyan\" \"npm run dev --prefix backend-node\" \"npm run dev --prefix frontend\"",
+    "dev:node": "npm run dev --prefix backend-node",
+    "dev:frontend": "npm run dev --prefix frontend"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

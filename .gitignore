@@ -1,0 +1,54 @@
+# Environment files (secrets, configs)
+.env
+.env.*
+
+# Node.js dependencies
+node_modules/
+
+# Build output / distribution
+dist/
+build/
+
+# API keys or certificates
+*.key
+*.pem
+*.crt
+*.cert
+*.secret
+*.config
+
+# ── Environment / secrets ──────────────────────────────────────
+.env
+.env.local
+.env.*.local
+
+# ── Node ───────────────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# ── Python ─────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# ── Vite / frontend build ───────────────────────────────────────
+frontend/dist/
+frontend/.vite/
+
+# ── OS artifacts ───────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Editor ─────────────────────────────────────────────────────
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
