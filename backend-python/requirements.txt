@@ -1,4 +1,4 @@
-fastapi
+﻿fastapi
 uvicorn
 websockets
 python-multipart
@@ -6,3 +6,8 @@ torch
 transformers
 librosa
 soundfile
+numpy
+scikit-learn
+joblib
+groq
+python-dotenv
