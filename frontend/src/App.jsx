@@ -8,15 +8,18 @@
 //  4. ProfileBadge hides label on small screens via inline responsive styles
 //  5. Loading state is centred properly inside the new content-scroll container
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, Wind, Zap, Sun, Moon } from 'lucide-react';
+import { Mic, Wind, Zap, Sun, Moon, HeartPulse } from 'lucide-react';
 import useStore from './store/useStore.js';
 import { shatterApi, stateApi } from './services/api.js';
 import ErrorBoundary        from './components/ErrorBoundary.jsx';
 import AuraVoice            from './components/aura-voice/AuraVoice.jsx';
 import CognitiveForge       from './components/cognitive-forge/CognitiveForge.jsx';
 import TaskShatter          from './components/task-shatter/TaskShatter.jsx';
+import ClinicalRecovery     from './components/clinical-rag/ClinicalRecovery.jsx';
+import Dashboard            from './components/observer-portal/Dashboard.jsx';
+import LandingPage          from './components/landing/LandingPage.jsx';
 import MentalHealthIntake,
   { PROFILES }              from './components/MentalHealthIntake.jsx';
 
@@ -25,6 +28,7 @@ const TABS = [
   { id: 'voice',   label: 'Aura',    Icon: Mic,  color: '#00e5ff' },
   { id: 'forge',   label: 'Forge',   Icon: Wind, color: '#ffb300' },
   { id: 'shatter', label: 'Shatter', Icon: Zap,  color: '#c4b5fd' },
+  { id: 'protocol',label: 'Protocol',Icon: HeartPulse, color: '#ff6b8a' },
 ];
 
 /* ── Profile badge shown in the nav ─────────────────────────── */
@@ -56,7 +60,7 @@ function ProfileBadge({ profile, onReset }) {
 
 /* ═══════════════════════════════════════════════════════════════════════
    MAIN APP COMPONENT
-═══════════════════════════════════════════════════════════════════════ */
+   ═══════════════════════════════════════════════════════════════════════ */
 export default function App() {
   const {
     activeTab, setTab,
@@ -65,9 +69,12 @@ export default function App() {
     userProfile, setUserProfile, clearUserProfile,
   } = useStore();
 
+  const isPortalView = typeof window !== 'undefined' && window.location.pathname.startsWith('/portal');
+
   const [initError,    setInitError]    = useState(false);
   const [resumeBanner, setResumeBanner] = useState(null);
   const [isDark,       setIsDark]       = useState(true);
+  const [showLanding,  setShowLanding]  = useState(!isPortalView);
   const [showIntake,   setShowIntake]   = useState(false);
 
   // Ref so the profile-tab effect only fires once on mount,
@@ -81,24 +88,20 @@ export default function App() {
 
   /* ── Session init ── */
   useEffect(() => {
+    if (isPortalView) return;
     initSession().catch(() => setInitError(true));
-    // initSession is stable (created once by zustand) — no dep needed
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [initSession, isPortalView]);
 
   /* ── Show intake on first visit (no stored profile) ── */
   useEffect(() => {
-    if (!isInitialized) return;
+    if (!isInitialized || isPortalView || showLanding) return;
     if (!userProfile) {
       const t = setTimeout(() => setShowIntake(true), 500);
       return () => clearTimeout(t);
     }
-  }, [isInitialized, userProfile]);
+  }, [isInitialized, userProfile, isPortalView, showLanding]);
 
   /* ── Set default tab from profile — fires ONCE per session ── */
-  // We use a ref guard so that if the user later navigates between tabs,
-  // we don't reset them back to the profile's primaryTab.
-  // Also, if a task was resumed (resume banner visible), skip the tab
-  // override since TaskShatter already set the tab to 'shatter'.
   useEffect(() => {
     if (
       isInitialized &&
@@ -113,7 +116,9 @@ export default function App() {
 
   /* ── Resume active task from previous session ── */
   useEffect(() => {
+    if (isPortalView) return;
     if (!userId || !isInitialized) return;
+
     shatterApi.getActive(userId)
       .then((data) => {
         if (data?.activeTask) {
@@ -126,14 +131,13 @@ export default function App() {
         }
       })
       .catch(() => { /* non-fatal */ });
-  }, [userId, isInitialized, setActiveTask, setTab]);
+  }, [userId, isInitialized, isPortalView, setActiveTask, setTab]);
 
   /* ── Intake handlers ── */
   const handleIntakeComplete = (profileData) => {
     setUserProfile(profileData);
     setShowIntake(false);
     // Only set the profile's recommended tab if no task was resumed.
-    // If there IS a resume banner, the tab is already 'shatter' — respect that.
     if (!resumeBanner) {
       setTab(profileData.primaryTab || 'forge');
       profileTabSetRef.current = true;
@@ -152,12 +156,36 @@ export default function App() {
   };
 
   /* ── Background gradient accent from user profile ── */
-  const profileColor = userProfile
-    ? PROFILES[userProfile.profileId]?.glow
-    : null;
-  const bodyAccentStyle = profileColor
-    ? { '--profile-glow': profileColor }
-    : {};
+  const bodyAccentStyle = useMemo(() => {
+    const profileColor = userProfile ? PROFILES[userProfile.profileId]?.glow : null;
+    return profileColor ? { '--profile-glow': profileColor } : {};
+  }, [userProfile]);
+
+  /* ── Early returns for special views ── */
+  if (isPortalView) {
+    return (
+      <ErrorBoundary label="Observer Portal">
+        <Dashboard />
+      </ErrorBoundary>
+    );
+  }
+
+  if (showLanding) {
+    return (
+      <AnimatePresence mode="wait">
+        <motion.div 
+          key="landing" 
+          initial={{opacity:0}} 
+          animate={{opacity:1}} 
+          exit={{opacity:0, y:-20}} 
+          transition={{duration:0.4}} 
+          style={{width:'100vw', minHeight:'100vh'}}
+        >
+          <LandingPage onLaunch={() => setShowLanding(false)} />
+        </motion.div>
+      </AnimatePresence>
+    );
+  }
 
   return (
     <>
@@ -203,7 +231,6 @@ export default function App() {
       <div className="app" style={bodyAccentStyle}>
 
         {/* ── Sticky nav ── */}
-        {/* top offset accounts for the resume banner height (40px) */}
         <nav className="topnav" style={{ top: resumeBanner ? 40 : 0 }}>
 
           {/* Logo */}
@@ -270,7 +297,6 @@ export default function App() {
               flex: 1,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               flexDirection: 'column', gap: 20,
-              /* min-height fills the available scroll space */
               minHeight: 'calc(100dvh - 64px)',
             }}>
               {initError ? (
@@ -326,6 +352,11 @@ export default function App() {
                 {activeTab === 'shatter' && (
                   <ErrorBoundary label="Task Shatterer">
                     <TaskShatter userProfile={userProfile} />
+                  </ErrorBoundary>
+                )}
+                {activeTab === 'protocol' && (
+                  <ErrorBoundary label="Clinical Protocol">
+                    <ClinicalRecovery userProfile={userProfile} />
                   </ErrorBoundary>
                 )}
 

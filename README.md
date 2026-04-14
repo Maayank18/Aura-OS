@@ -10,13 +10,15 @@ Current mental health apps are overwhelmingly passive. They ask you to fill out 
 
 ## Our solution
 
-Three intervention modes, each targeting a different failure state:
+Four intervention modes, each targeting a different failure state:
 
 | Mode | Trigger | Mechanism |
 |---|---|---|
 | **Aura Voice** | Racing thoughts, can't articulate | Voice AI that reads acoustic emotion, not just words |
 | **Cognitive Forge** | Panic, overwhelmed by worries | Physics-based worry destruction — literally drag fears into fire |
 | **Task Shatterer** | ADHD task paralysis, frozen | AI breaks goals into 2-minute micro-quests, shown one at a time |
+| **Aura Recovery Protocol** | Deep recovery & lifestyle planning | High-fidelity neuro-chemical diet and exercise plans based on clinical telemetry |
+| **Clinical RAG Intelligence** | Seeking grounded recovery steps | AI retrieves evidence-based nutrition and exercise recommendations using ChromaDB |
 
 ---
 
@@ -24,9 +26,9 @@ Three intervention modes, each targeting a different failure state:
 
 ```
 aura-os/
-├── frontend/         React + Vite · Matter.js · Zustand
+├── frontend/         React + Vite · Matter.js · Zustand · Framer Motion
 ├── backend-node/     Express · LangChain · Gemini API · MongoDB
-├── backend-python/   FastAPI · Whisper · Groq · ElevenLabs  (Deepanshu)
+├── backend-python/   FastAPI · Whisper · Groq · ElevenLabs · ChromaDB (Deepanshu)
 └── docs/             API_CONTRACTS.md · architecture diagram
 ```
 
@@ -63,6 +65,23 @@ Solves ADHD task paralysis by destroying monolithic goals.
 - **Focus Anchor:** Brown noise loops via HTML5 Audio while a task is active (scientifically backed ADHD focus aid)
 - **Body Double:** `document.visibilityState` polling — if user switches tabs for > 8 seconds, a fullscreen SVG avatar appears: *"Hey — we were in a focus block."*
 
+### 4. Aura Recovery Protocol — Personalized Neuro-Support
+
+The latest addition to the Clinical suite. Based on your session telemetry (vocal stress, task completion, worry weights), Aura prescribes a highly specific recovery plan.
+
+- **Neuro-Diet Plan:** Specific nutritional interventions (e.g., Magnesium-rich foods for anxiety, Dopamine-supportive snacks for ADHD).
+- **Somatic Exercise:** Prescribed physical activities targeted at your current neuro-chemical state (Zone 2 cardio, progressive muscle relaxation).
+- **Confidence Anchors:** Psychologically grounding statements to break the freeze.
+- **Strict Grounding:** All protocols are grounded in Nutritional Psychiatry and Exercise Physiology rules.
+
+### 5. Clinical RAG Intelligence — Evidence-Based Knowledge
+
+A personalized, scientifically-backed recovery system engineered for users needing grounded, clinical advice.
+
+- **Knowledge Base:** ChromaDB vector store ingests scientific papers on Nutritional Psychiatry and Exercise Physiology.
+- **RAG Engine:** Groq LLM queries the vector store, augmenting the prompt with condition (ADHD/Anxiety), severity, and baseline arousal scores.
+- **Frontend Integration:** Fast rendering and tailored protocol creation with polished framer-motion transitions for readability.
+
 ---
 
 ## Tech stack
@@ -75,7 +94,7 @@ Solves ADHD task paralysis by destroying monolithic goals.
 | Backend AI orchestration | LangChain + Groq | `withStructuredOutput` = validated JSON guaranteed |
 | Worry extraction | Google Gemini Flash | Long context + fast for stream-of-consciousness text |
 | Database | MongoDB Atlas | Flexible schema for evolving worry/task models |
-| Audio ML | FastAPI + Whisper + librosa | Low-latency Python pipeline, isolated from Node |
+| Audio ML | FastAPI + Whisper + XGBoost + RF | GPU-accelerated ensemble ML pipeline |
 | TTS | ElevenLabs | Emotionally nuanced voice output |
 
 ---
@@ -126,9 +145,68 @@ npm run dev
 npm run dev:node      # backend-node on :5001
 npm run dev:frontend  # frontend on :5173
 
-# Python backend (Deepanshu's service)
+# Python backend (Audio ML service)
 cd backend-python && uvicorn app.main:app --reload --port 8000
 ```
+
+---
+
+## 🚀 Easy Start Guide: Python Backend (For Normal Persons)
+
+The Python backend handles the voice emotion recognition. Here is how to set it up step-by-step:
+
+### 1. Install Python
+If you don't have it, download and install **Python 3.11 or 3.12** from [python.org](https://www.python.org/downloads/). 
+> [!IMPORTANT]
+> During installation, make sure to check the box that says **"Add Python to PATH"**.
+
+### 2. Open your Terminal
+- **Windows:** Press the `Win` key, type `cmd`, and press Enter.
+- **Mac/Linux:** Open the `Terminal` app.
+
+### 3. Navigate to the project
+Type this command (change the path to where you saved the folder):
+```bash
+cd path/to/Aura-OS/backend-python
+```
+
+### 4. Create a "Private" Environment
+This keeps the project dependencies separate from your computer.
+```bash
+python -m venv venv
+```
+
+### 5. Activate the Environment
+- **Windows:** `venv\Scripts\activate`
+- **Mac/Linux:** `source venv/bin/activate`
+
+### 6. Install the dependencies
+This might take a few minutes as it downloads the AI and audio processing tools.
+```bash
+pip install -r requirements.txt
+```
+
+### 7. Set your API Key
+1. In the `backend-python` folder, copy `.env.example` and rename it to `.env`.
+2. Open `.env` in Notepad and paste your **GROQ_API_KEY**.
+
+### 8. Start the server!
+```bash
+uvicorn app.main:app --reload --port 8000
+```
+You should see a message saying "Application startup complete."
+
+---
+
+## 🐋 Easy Start Guide: Docker (One-Click Setup)
+If you have **Docker Desktop** installed, you can start the *entire* app (Frontend + Node + Python) with one command from the main `Aura-OS` folder:
+
+```bash
+docker-compose up --build
+```
+This is the recommended way to run the full system without manually installing dependencies.
+
+---
 
 ### 5. Verify before demo
 
@@ -207,7 +285,7 @@ When someone is in crisis, they cannot navigate. So we made navigation unnecessa
 
 # AuraOS API Contracts
 > **Source of truth** for the interface between backend-node (Mayank) ↔ frontend (Mayank) ↔ backend-python (Deepanshu).
-> Last updated: Vihaan DTU 9.0 Hackathon
+> Last updated: AuraOS Beta
 
 ---
 

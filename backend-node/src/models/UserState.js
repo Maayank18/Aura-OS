@@ -3,6 +3,7 @@
 // All new clinical fields are ADDITIVE — existing fields untouched.
 
 import mongoose from 'mongoose';
+import { dbReady } from '../config/db.js';
 
 /* ── Sub-schemas ───────────────────────────────────────────── */
 
@@ -122,20 +123,71 @@ UserStateSchema.pre('save', function (next) {
   next();
 });
 
-UserStateSchema.statics.findOrCreate = async function (userId) {
-  let user = await this.findOne({ userId });
-  if (!user) {
-    user = await this.create({ userId, sessionsCount: 1 });
-  } else {
-    user.sessionsCount += 1;
-    user.lastActive = new Date();
-    await user.save();
+UserStateSchema.statics.findOrCreate = async function (userId, options = {}) {
+  const { incrementSession = false } = options;
+
+  // Skip Mongoose entirely when DB is unreachable — instant fallback
+  if (!dbReady) {
+    return _inMemoryFallback(userId);
   }
-  return user;
+
+  try {
+    let user = await this.findOne({ userId });
+    if (!user) {
+      user = await this.create({ userId, sessionsCount: 1 });
+    } else {
+      if (incrementSession) {
+        user.sessionsCount += 1;
+      }
+      user.lastActive = new Date();
+      await user.save();
+    }
+    return user;
+  } catch (err) {
+    console.warn(`[UserState] DB error in findOrCreate(${userId}):`, err.message);
+    return _inMemoryFallback(userId);
+  }
+};
+
+function _inMemoryFallback(userId) {
+  return {
+    userId,
+    sessionsCount: 1,
+    lastActive: new Date(),
+    vaultedWorries: [],
+    taskHistory: [],
+    guardian: {},
+    clinicalTelemetry: { vocalStressEvents: [], forgeSessions: [], executiveFunction: [], stressSpikes: [] },
+    ensureClinicalTelemetry() {},
+    logVocalStress: async () => {},
+    logForgeSession: async () => {},
+    logExecFunction: async () => {},
+    save: async () => {},
+    _isInMemoryFallback: true,
+  };
+}
+
+UserStateSchema.methods.ensureClinicalTelemetry = function () {
+  if (!this.clinicalTelemetry || typeof this.clinicalTelemetry !== 'object') {
+    this.clinicalTelemetry = {};
+  }
+  if (!Array.isArray(this.clinicalTelemetry.vocalStressEvents)) {
+    this.clinicalTelemetry.vocalStressEvents = [];
+  }
+  if (!Array.isArray(this.clinicalTelemetry.forgeSessions)) {
+    this.clinicalTelemetry.forgeSessions = [];
+  }
+  if (!Array.isArray(this.clinicalTelemetry.executiveFunction)) {
+    this.clinicalTelemetry.executiveFunction = [];
+  }
+  if (!Array.isArray(this.clinicalTelemetry.stressSpikes)) {
+    this.clinicalTelemetry.stressSpikes = [];
+  }
 };
 
 // 🌟 NEW: Convenience helper — push a vocal stress event
 UserStateSchema.methods.logVocalStress = async function ({ emotion, arousalScore, taskContext }) {
+  this.ensureClinicalTelemetry();
   this.clinicalTelemetry.vocalStressEvents.push({ emotion, arousalScore, taskContext });
   // Keep rolling 90-day window
   const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
@@ -146,12 +198,14 @@ UserStateSchema.methods.logVocalStress = async function ({ emotion, arousalScore
 
 // 🌟 NEW: Push a forge session event
 UserStateSchema.methods.logForgeSession = async function ({ wordCount, worryDensity, worryCount }) {
+  this.ensureClinicalTelemetry();
   this.clinicalTelemetry.forgeSessions.push({ wordCount, worryDensity, worryCount });
   return this.save();
 };
 
 // 🌟 NEW: Push an executive function event
 UserStateSchema.methods.logExecFunction = async function ({ taskId, taskSummary, status, blocker }) {
+  this.ensureClinicalTelemetry();
   this.clinicalTelemetry.executiveFunction.push({ taskId, taskSummary, status, blocker });
   return this.save();
 };
