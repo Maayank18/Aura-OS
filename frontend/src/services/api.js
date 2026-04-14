@@ -8,6 +8,16 @@ const BASE        = '/api';       // Vite proxy → http://localhost:5001
 const AI_TIMEOUT  = 25_000;       // 25s — Gemini/Groq cold-start allowance
 const API_TIMEOUT = 8_000;        // 8s  — DB + health endpoints
 
+const parseJsonSafe = async (res) => {
+  const raw = await res.text();
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return { error: raw.slice(0, 300) || null };
+  }
+};
+
 const req = async (method, path, body, timeoutMs = API_TIMEOUT) => {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -20,7 +30,7 @@ const req = async (method, path, body, timeoutMs = API_TIMEOUT) => {
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
 
-    const json = await res.json();
+    const json = await parseJsonSafe(res);
     if (!res.ok || !json.success) {
       throw new Error(json.error || `Request failed (${res.status})`);
     }
@@ -70,4 +80,15 @@ export const shatterApi = {
   abandon:        (userId, taskId)                 => post('/shatter/abandon', { userId, taskId }),
   getActive:      (userId)                         => get(`/shatter/active/${userId}`),
   getHistory:     (userId)                         => get(`/shatter/history/${userId}`),
+};
+
+// ── Python RAG Backend ────────────────────────────────────────────────────────
+export const pythonApi = {
+  ragProtocol: (condition, severity, arousal_score, userId) =>
+    postAI('/v1/rag/recovery-protocol', { condition, severity, arousal_score, user_id: userId }),
+};
+
+// ── Clinical API ──────────────────────────────────────────────────────────────
+export const clinicalApi = {
+  generateRecoveryProtocol: (userId, reportData) => postAI('/clinical/recovery-protocol', { userId, reportData }),
 };

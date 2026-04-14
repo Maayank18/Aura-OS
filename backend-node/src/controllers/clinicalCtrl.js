@@ -11,12 +11,15 @@
 import UserState   from '../models/UserState.js';
 import AlertLog    from '../models/AlertLog.js';
 import ClinicalReport from '../models/ClinicalReport.js';
-import { generateGuardianBrief } from '../services/langchain.js';
+import { generateGuardianBrief, generateRecoveryProtocol } from '../services/langchain.js';
 import { sendGuardianAlert }     from '../services/twilio.js';
 import { sendGuardianReportEmail } from '../services/email.js';
 import { buildClinicalReportPdfBuffer } from '../services/reportPdf.js';
 import { evaluateBurnoutRisk }   from '../services/triageEngine.js';
 import { AppError }              from '../middleware/errorHandler.js';
+
+// Fallback cache for generating PDFs when MongoDB is offline
+const localMemoryReports = new Map();
 
 const toSafeString = (v, max = 300) => String(v || '').trim().slice(0, max);
 
@@ -108,6 +111,7 @@ export const triggerAlertHandler = async (req, res, next) => {
     const resolvedEmotion = emotion || (resolvedArousal >= 8 ? 'high_anxiety' : resolvedArousal >= 5 ? 'mild_anxiety' : 'calm');
 
     const user = await UserState.findOrCreate(userId);
+    user.ensureClinicalTelemetry?.();
 
     if (guardianPhone || guardianName || guardianRelation || alertPreference) {
       user.guardian = {
@@ -220,6 +224,7 @@ export const logVocalStressHandler = async (req, res, next) => {
     if (!userId) throw new AppError('userId is required.', 400);
 
     const user = await UserState.findOrCreate(userId);
+    user.ensureClinicalTelemetry?.();
     user.clinicalTelemetry.vocalStressEvents.push({ emotion, arousalScore, taskContext });
     await user.save();
 
@@ -280,11 +285,15 @@ export const getDashboardMetricsHandler = async (req, res, next) => {
     const { userId } = req.params;
     const { days = 7 } = req.query;
     if (!userId) throw new AppError('userId is required.', 400);
+    const parsedDays = Number(days);
+    const safeDays = Number.isFinite(parsedDays)
+      ? Math.min(30, Math.max(1, Math.floor(parsedDays)))
+      : 7;
 
     const user = await UserState.findOne({ userId }).lean();
     if (!user) return res.json({ success: true, empty: true });
 
-    const since    = new Date(Date.now() - Number(days) * 24 * 60 * 60 * 1000);
+    const since    = new Date(Date.now() - safeDays * 24 * 60 * 60 * 1000);
     const telemetry = user.clinicalTelemetry || {};
 
     // ── Vocal Stress Index (daily average) ──────────────────────────────────
@@ -401,10 +410,16 @@ export const generateSessionReportHandler = async (req, res, next) => {
 
     if (!userId) throw new AppError('userId is required.', 400);
 
-    const user = await UserState.findOrCreate(userId);
-    const activeTask = taskId
-      ? (user.taskHistory || []).find((t) => t.id === taskId)
-      : (user.taskHistory || []).find((t) => t.status === 'active');
+    let user = {};
+    let activeTask = null;
+    try {
+      user = await UserState.findOrCreate(userId);
+      activeTask = taskId
+        ? (user.taskHistory || []).find((t) => t.id === taskId)
+        : (user.taskHistory || []).find((t) => t.status === 'active');
+    } catch (dbErr) {
+      console.warn('[Clinical] DB unavailable. Bypassing user lookup for report.', dbErr.message);
+    }
 
     const resolvedTask = toSafeString(
       currentTask || activeTask?.originalTask || sessionSnapshot?.currentTask || '',
@@ -449,7 +464,21 @@ export const generateSessionReportHandler = async (req, res, next) => {
       }
     }
 
-    const report = await ClinicalReport.create({
+    let recoveryProtocol = sessionSnapshot?.recoveryProtocol || null;
+    if (!recoveryProtocol) {
+      try {
+        recoveryProtocol = await generateRecoveryProtocol({
+          status: "Snapshot Context Recovery Protocol",
+          taskSummary: resolvedTask,
+          vocalArousal: resolvedArousal,
+          emotion: resolvedArousal >= 8 ? 'high_anxiety' : 'mild_anxiety',
+        });
+      } catch (err) {
+        console.warn('[Clinical] Recovery protocol inline generation failed', err.message);
+      }
+    }
+
+    const draftReport = {
       userId,
       source: ['panic', 'manual', 'auto'].includes(source) ? source : 'manual',
       currentTask: resolvedTask,
@@ -462,6 +491,8 @@ export const generateSessionReportHandler = async (req, res, next) => {
         : 'watch',
       shatteredWorryBlocks: normalizeWorryBlocks(sessionSnapshot?.shatteredWorryBlocks, user.vaultedWorries || []),
       timelineMicroquests: normalizeTimeline(sessionSnapshot?.timelineMicroquests, activeTask || null),
+      gameSessions: Array.isArray(sessionSnapshot?.gameSessions) ? sessionSnapshot.gameSessions : [],
+      recoveryProtocol,
       guardian: {
         name: toSafeString(user.guardian?.name, 120),
         email: toSafeString(user.guardian?.email, 200),
@@ -471,10 +502,23 @@ export const generateSessionReportHandler = async (req, res, next) => {
       meta: {
         notes: toSafeString(sessionSnapshot?.notes, 1000),
         generatedAt: new Date(),
+        gameSessions: Array.isArray(sessionSnapshot?.gameSessions) ? sessionSnapshot.gameSessions : [],
       },
-    });
+    };
 
-    const downloadUrl = buildPublicReportUrl(req, report._id.toString());
+    let report = draftReport;
+    let fallbackReportId = `local-${Date.now()}`;
+    try {
+      // Create via Mongoose if online
+      report = await ClinicalReport.create(draftReport);
+      report._id = report._id.toString();
+    } catch (dbErr) {
+      console.warn('[Clinical] Mongoose offline. Keeping report in memory for PDF generation.');
+      report._id = fallbackReportId;
+      localMemoryReports.set(fallbackReportId, report);
+    }
+
+    const downloadUrl = buildPublicReportUrl(req, report._id);
     const pdfBuffer = await buildClinicalReportPdfBuffer(report);
 
     let whatsappResult = { skipped: true, channel: 'whatsapp' };
@@ -489,7 +533,7 @@ export const generateSessionReportHandler = async (req, res, next) => {
 
       const mediaBase = process.env.TWILIO_MEDIA_PUBLIC_BASE_URL || process.env.REPORT_PUBLIC_BASE_URL || null;
       const mediaUrl = mediaBase
-        ? `${mediaBase.replace(/\/$/, '')}/api/clinical/session-report/${report._id.toString()}/pdf`
+        ? `${mediaBase.replace(/\/$/, '')}/api/clinical/session-report/${report._id}/pdf`
         : null;
 
       const [waSettled, emailSettled] = await Promise.allSettled([
@@ -508,7 +552,7 @@ export const generateSessionReportHandler = async (req, res, next) => {
               guardianName: report.guardian?.name,
               userId,
               riskLevel: report.riskLevel,
-              reportId: report._id.toString(),
+              reportId: report._id,
               summary: report.aiStressSummary,
               downloadUrl,
               pdfBuffer,
@@ -524,30 +568,41 @@ export const generateSessionReportHandler = async (req, res, next) => {
         ? emailSettled.value
         : { success: false, channel: 'email', error: emailSettled.reason?.message || 'Email dispatch failed' };
 
-      await AlertLog.create({
-        userId,
-        guardianPhone: report.guardian?.phone || null,
-        guardianEmail: report.guardian?.email || null,
-        channel: whatsappResult.mock ? 'mock' : (whatsappResult.success ? 'whatsapp' : (emailResult.success ? 'email' : 'mock')),
-        riskLevel: report.riskLevel,
-        triggerReason: `${report.selectedBlocker || 'stress'} during "${report.currentTask || 'session'}"`,
-        briefText: [brief.observed_pattern, brief.parent_action].join('\n\n').slice(0, 3000),
-        deliveryStatus: whatsappResult.success || emailResult.success
-          ? (whatsappResult.mock && emailResult.mock ? 'mock' : 'sent')
-          : 'failed',
-        twilioSid: whatsappResult.sid || null,
-      });
+      try {
+        await AlertLog.create({
+          userId,
+          guardianPhone: report.guardian?.phone || null,
+          guardianEmail: report.guardian?.email || null,
+          channel: whatsappResult.mock ? 'mock' : (whatsappResult.success ? 'whatsapp' : (emailResult.success ? 'email' : 'mock')),
+          riskLevel: report.riskLevel,
+          triggerReason: `${report.selectedBlocker || 'stress'} during "${report.currentTask || 'session'}"`,
+          briefText: [brief.observed_pattern, brief.parent_action].join('\n\n').slice(0, 3000),
+          deliveryStatus: whatsappResult.success || emailResult.success
+            ? (whatsappResult.mock && emailResult.mock ? 'mock' : 'sent')
+            : 'failed',
+          twilioSid: whatsappResult.sid || null,
+        });
+      } catch (dbErr) {
+        console.warn('[Clinical] AlertLog.create skipped (DB offline)');
+      }
     }
 
     report.delivery = {
       whatsapp: deliveryStatusFromResult(whatsappResult),
       email: deliveryStatusFromResult(emailResult),
     };
-    await report.save();
+    
+    try {
+      if (typeof report.save === 'function') {
+        await report.save();
+      }
+    } catch(e) {
+      console.warn('[Clinical] report.save skipped (DB offline)');
+    }
 
     res.json({
       success: true,
-      reportId: report._id.toString(),
+      reportId: report._id,
       riskLevel: report.riskLevel,
       aiStressSummary: report.aiStressSummary,
       downloadUrl,
@@ -565,15 +620,29 @@ export const downloadSessionReportPdfHandler = async (req, res, next) => {
     const { reportId } = req.params;
     if (!reportId) throw new AppError('reportId is required.', 400);
 
-    const report = await ClinicalReport.findById(reportId).lean();
-    if (!report) throw new AppError('Report not found.', 404);
+    let report = null;
+    if (reportId.startsWith('local-')) {
+      report = localMemoryReports.get(reportId);
+    } else {
+      try {
+        report = await ClinicalReport.findById(reportId).lean();
+      } catch (dbErr) {
+        console.warn(`[Clinical] Mongoose findById failed for ${reportId} or offline.`);
+      }
+    }
+
+    if (!report) throw new AppError('Report not found or expired from local memory.', 404);
 
     const pdfBuffer = await buildClinicalReportPdfBuffer(report);
 
-    await ClinicalReport.updateOne(
-      { _id: reportId },
-      { $inc: { 'meta.pdfDownloads': 1 } }
-    );
+    if (!reportId.startsWith('local-')) {
+      try {
+        await ClinicalReport.updateOne(
+          { _id: reportId },
+          { $inc: { 'meta.pdfDownloads': 1 } }
+        );
+      } catch (e) {}
+    }
 
     const filename = `AuraOS-Clinical-Report-${report.userId || 'user'}-${reportId}.pdf`;
     res.setHeader('Content-Type', 'application/pdf');
@@ -586,7 +655,9 @@ export const downloadSessionReportPdfHandler = async (req, res, next) => {
 function _groupByDay(events, valueFn, key) {
   const map = {};
   events.forEach(e => {
-    const day = new Date(e.timestamp).toISOString().split('T')[0];
+    const dt = new Date(e.timestamp);
+    if (Number.isNaN(dt.getTime())) return;
+    const day = dt.toISOString().split('T')[0];
     if (!map[day]) map[day] = { day, sum: 0, count: 0 };
     map[day].sum += valueFn(e);
     map[day].count += 1;
@@ -599,7 +670,9 @@ function _groupByDay(events, valueFn, key) {
 function _groupByDayRatio(events, key) {
   const map = {};
   events.forEach(e => {
-    const day = new Date(e.timestamp).toISOString().split('T')[0];
+    const dt = new Date(e.timestamp);
+    if (Number.isNaN(dt.getTime())) return;
+    const day = dt.toISOString().split('T')[0];
     if (!map[day]) map[day] = { day, completed: 0, total: 0 };
     map[day].total += 1;
     if (e.status === 'completed') map[day].completed += 1;
@@ -611,3 +684,48 @@ function _groupByDayRatio(events, key) {
     }))
     .sort((a, b) => a.day.localeCompare(b.day));
 }
+
+// ── POST /api/clinical/recovery-protocol ─────────────────────────────────────────
+// Generates a recovery protocol (diet & exercise) based on clinical telemetry.
+export const generateRecoveryProtocolHandler = async (req, res, next) => {
+  try {
+    const { userId, reportData } = req.body;
+    if (!userId) throw new AppError('userId is required.', 400);
+
+    let telemetryDataToUse = reportData;
+    
+    if (!telemetryDataToUse) {
+      try {
+        const user = await UserState.findOne({ userId }).lean();
+        if (user) {
+          const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+          const telemetry = user.clinicalTelemetry || {};
+          const recentExec = (telemetry.executiveFunction || []).filter(e => new Date(e.timestamp) > since);
+          telemetryDataToUse = { 
+             recentExecutiveFunction: recentExec,
+             vocalStressEvents: telemetry.vocalStressEvents || [],
+          };
+        }
+      } catch (dbErr) {
+        console.warn('[Clinical] DB fetch failed. Mongoose might be offline. Proceeding with fallback.', dbErr.message);
+      }
+      
+      if (!telemetryDataToUse) {
+         telemetryDataToUse = { 
+            status: "DB unavailable, utilizing default baseline for generation.", 
+            userId 
+         };
+      }
+    }
+
+    const protocol = await generateRecoveryProtocol(telemetryDataToUse);
+
+    res.json({
+      success: true,
+      generatedAt: new Date().toISOString(),
+      protocol,
+    });
+  } catch (err) {
+    next(err);
+  }
+};

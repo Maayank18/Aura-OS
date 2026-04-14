@@ -9,9 +9,12 @@
     "dev": "nodemon server.js"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.21.0",
     "@langchain/core": "^1.1.39",
+    "@langchain/groq": "^0.1.0",
     "@langchain/openai": "^1.4.4",
     "@react-pdf/renderer": "^4.4.1",
+    "aura-os-root": "file:..",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
@@ -25,5 +28,8 @@
     "twilio": "^5.13.1",
     "uuid": "^10.0.0",
     "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
   }
 }
