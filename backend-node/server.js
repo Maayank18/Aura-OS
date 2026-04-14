@@ -27,8 +27,10 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
 }));
-app.use(express.json({ limit: '10kb' }));
-app.use(express.urlencoded({ extended: false }));
+// app.use(express.json({ limit: '10kb' }));
+// app.use(express.urlencoded({ extended: false }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
 app.get('/health', (_, res) => res.json({
