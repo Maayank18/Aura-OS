@@ -10,15 +10,17 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, Wind, Zap, Sun, Moon } from 'lucide-react';
+import { Mic, Wind, Zap } from 'lucide-react';
 import useStore from './store/useStore.js';
 import { shatterApi, stateApi } from './services/api.js';
 import ErrorBoundary        from './components/ErrorBoundary.jsx';
 import AuraVoice            from './components/aura-voice/AuraVoice.jsx';
 import CognitiveForge       from './components/cognitive-forge/CognitiveForge.jsx';
 import TaskShatter          from './components/task-shatter/TaskShatter.jsx';
+import ThemeSelector        from './components/ThemeSelector.jsx';
 import MentalHealthIntake,
   { PROFILES }              from './components/MentalHealthIntake.jsx';
+import { DEFAULT_THEME, THEME_IDS } from './theme/themeOptions.js';
 
 /* ── Nav tabs ───────────────────────────────────────────────── */
 const TABS = [
@@ -67,7 +69,10 @@ export default function App() {
 
   const [initError,    setInitError]    = useState(false);
   const [resumeBanner, setResumeBanner] = useState(null);
-  const [isDark,       setIsDark]       = useState(true);
+  const [theme, setTheme] = useState(() => {
+    const storedTheme = localStorage.getItem('aura-theme');
+    return storedTheme && THEME_IDS.has(storedTheme) ? storedTheme : DEFAULT_THEME;
+  });
   const [showIntake,   setShowIntake]   = useState(false);
 
   // Ref so the profile-tab effect only fires once on mount,
@@ -76,8 +81,10 @@ export default function App() {
 
   /* ── Theme ── */
   useEffect(() => {
-    document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
-  }, [isDark]);
+    document.documentElement.style.colorScheme = theme === 'light' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('aura-theme', theme);
+  }, [theme]);
 
   /* ── Session init ── */
   useEffect(() => {
@@ -159,6 +166,12 @@ export default function App() {
     ? { '--profile-glow': profileColor }
     : {};
 
+  const handleThemeChange = (nextTheme) => {
+    if (THEME_IDS.has(nextTheme)) {
+      setTheme(nextTheme);
+    }
+  };
+
   return (
     <>
       {/* ── Intake overlay — rendered outside .app so it's truly full-screen ── */}
@@ -239,25 +252,13 @@ export default function App() {
           </div>
 
           {/* Right controls */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <div className="topnav-actions">
             {/* Profile badge — click to retake intake */}
             {userProfile && (
               <ProfileBadge profile={userProfile} onReset={handleRetakeIntake} />
             )}
 
-            {/* Theme toggle */}
-            <motion.button
-              onClick={() => setIsDark((v) => !v)}
-              whileTap={{ scale: 0.88, rotate: 22 }}
-              style={{
-                width: 36, height: 36, borderRadius: '50%',
-                background: 'var(--bg-glass)', border: '1px solid var(--border)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: 'var(--text-3)',
-              }}
-              aria-label="Toggle theme">
-              {isDark ? <Sun size={15} /> : <Moon size={15} />}
-            </motion.button>
+            <ThemeSelector currentTheme={theme} onChange={handleThemeChange} />
           </div>
         </nav>
 
