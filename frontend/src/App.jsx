@@ -20,6 +20,7 @@ import TaskShatter          from './components/task-shatter/TaskShatter.jsx';
 import ThemeSelector        from './components/ThemeSelector.jsx';
 import MentalHealthIntake,
   { PROFILES }              from './components/MentalHealthIntake.jsx';
+import CalmButton           from './components/CalmButton/CalmButton.jsx';
 import { DEFAULT_THEME, THEME_IDS } from './theme/themeOptions.js';
 
 /* ── Nav tabs ───────────────────────────────────────────────── */
@@ -217,37 +218,33 @@ export default function App() {
 
         {/* ── Sticky nav ── */}
         {/* top offset accounts for the resume banner height (40px) */}
-        <nav className="topnav" style={{ top: resumeBanner ? 40 : 0 }}>
+        <nav className="topnav h-16 shrink-0 flex items-center justify-between px-6" style={{ top: resumeBanner ? 40 : 0, backgroundColor: 'var(--theme-nav-bg)' }}>
 
           {/* Logo */}
           <div className="topnav-logo">
-            <div className="logo-orb" />
-            <span
-              className="logo-text"
-              style={{
-                background: 'linear-gradient(135deg,#00e5ff,#c4b5fd)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-              }}>
-              AuraOS
-            </span>
+            <div className="logo-orb" style={{ backgroundColor: 'var(--theme-logo-orb-bg)' }} />
+            <span className="logo-text">AuraOS</span>
           </div>
 
           {/* Tab pills (centre) */}
-          <div className="topnav-tabs">
+          <div className="flex items-center gap-2">
             {TABS.map(({ id, label, Icon, color }) => (
-              <motion.button
+              <CalmButton
                 key={id}
-                className={`nav-tab ${activeTab === id ? 'active' : ''}`}
-                onClick={() => setTab(id)}
+                as={motion.button}
                 whileTap={{ scale: 0.92 }}
-                style={activeTab === id
-                  ? { color, boxShadow: `inset 0 0 0 1px ${color}40`, background: `${color}12` }
-                  : {}
-                }>
-                <Icon size={13} />
-                <span className="nav-tab-label">{label}</span>
-              </motion.button>
+                onClick={() => setTab(id)}
+                style={{ padding: 0 }}
+                className={`transition-all duration-300 rounded-full 
+                  ${activeTab === id 
+                    ? 'bg-white/10 ring-1 ring-white/10 opacity-100' 
+                    : 'opacity-40 grayscale hover:opacity-100 hover:grayscale-0 hover:bg-white/5'}`}
+              >
+                <div className="flex items-center gap-2 px-4 py-1.5 min-w-[100px] justify-center">
+                  <Icon size={16} strokeWidth={2.5} />
+                  <span className="nav-tab-label text-[13px] font-bold tracking-wide uppercase">{label}</span>
+                </div>
+              </CalmButton>
             ))}
           </div>
 

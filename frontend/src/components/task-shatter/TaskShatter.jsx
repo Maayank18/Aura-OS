@@ -24,6 +24,7 @@ import SymptomInterruption from './SymptomInterruption.jsx';
 import useFocusTimer from '../../hooks/useFocusTimer.js';
 import useTelemetry from '../../hooks/useTelemetry.js';
 import useIdleDetection from '../../hooks/useIdleDetection.js';
+import CalmButton from '../CalmButton/CalmButton.jsx';
 
 /* ── Constants ──────────────────────────────────────────────────────── */
 const COLORS = [
@@ -223,7 +224,7 @@ function FragmentCard({ frag, onPositionChange, onDelete, onTextChange, onColorC
       }}
     >
       <div style={{
-        background: dragging ? 'rgba(10,20,42,0.98)' : 'rgba(6,14,30,0.9)',
+        background: dragging ? 'var(--theme-dragging-bg)' : 'var(--theme-default-bg)',
         backdropFilter: 'blur(20px)', borderRadius: 18,
         border: `1px solid ${color.border}`,
         boxShadow: dragging
@@ -761,19 +762,22 @@ export default function TaskShatter() {
           <div style={{ position: 'absolute', bottom: 13, right: 16, fontSize: 11, color: 'rgba(139,175,194,0.4)', fontWeight: 500 }}>⌘↵</div>
         </div>
 
-        <motion.button onClick={handleShowCoach} disabled={taskText.trim().length < 3}
-          whileHover={{ scale: 1.02, boxShadow: '0 12px 40px rgba(124,58,237,0.45)' }} whileTap={{ scale: 0.97 }}
-          style={{
-            width: '100%', padding: '17px', background: 'linear-gradient(135deg,#5b21b6,#7c3aed,#00b4d8)',
-            backgroundSize: '200% 200%', animation: 'gradSpin 6s ease infinite',
-            border: 'none', borderRadius: 16, color: 'white', fontFamily: 'inherit',
-            fontSize: 16, fontWeight: 800, letterSpacing: '-0.025em',
-            cursor: taskText.trim().length < 3 ? 'not-allowed' : 'pointer',
-            opacity: taskText.trim().length < 3 ? 0.45 : 1,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-          }}>
-          <Brain size={18} /> Talk to Aura Coach <ArrowRight size={16} />
-        </motion.button>
+        <div className="flex justify-center mt-6">
+          <CalmButton
+            onClick={handleShowCoach}
+            disabled={taskText.trim().length < 3}
+            as={motion.button}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.97 }}
+            className="w-auto"
+          >
+            <div className="flex items-center justify-center gap-2.5 px-8 py-2.5">
+              <Brain size={18} /> 
+              <span className="text-sm font-bold tracking-tight">Talk to Aura Coach</span> 
+              <ArrowRight size={16} />
+            </div>
+          </CalmButton>
+        </div>
         {error && <p style={{ marginTop: 14, fontSize: 13, color: '#ffb3c1', textAlign: 'center' }}>{error}</p>}
       </motion.div>
     </div>
@@ -1116,19 +1120,19 @@ export default function TaskShatter() {
           {allDocked && (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
               style={{ position: 'absolute', bottom: 148, left: '50%', transform: 'translateX(-50%)', zIndex: 300 }}>
-              <motion.button onClick={handleLaunchFocus}
-                whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
-                animate={{ boxShadow: ['0 6px 30px rgba(0,229,255,0.2)', '0 10px 50px rgba(0,229,255,0.45)', '0 6px 30px rgba(0,229,255,0.2)'] }}
-                transition={{ duration: 2.5, repeat: Infinity }}
-                style={{
-                  padding: '15px 38px', borderRadius: 999, border: 'none',
-                  background: 'linear-gradient(135deg,#00b4d8,#00e5ff)',
-                  color: '#020915', fontFamily: 'inherit', fontSize: 16, fontWeight: 800,
-                  letterSpacing: '-0.025em', cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', gap: 10,
-                }}>
-                <Play size={17} fill="#020915" /> Launch Focus Mode <ArrowRight size={15} />
-              </motion.button>
+            <CalmButton
+              as={motion.button}
+              onClick={handleLaunchFocus}
+              whileHover={{ scale: 1.04 }} 
+              whileTap={{ scale: 0.96 }}
+              className="px-10 py-4"
+            >
+              <div className="flex items-center gap-2.5">
+                <Play size={17} fill="currentColor" /> 
+                <span className="font-extrabold text-lg tracking-tight">Launch Focus Mode</span>
+                <ArrowRight size={15} />
+              </div>
+            </CalmButton>
             </motion.div>
           )}
         </AnimatePresence>

@@ -22,6 +22,7 @@ import useStore from '../../store/useStore.js';
 import { forgeApi } from '../../services/api.js';
 import PerceptionProbe from '../PerceptionProbe.jsx';
 import usePhysics from '../../hooks/usePhysics.js';
+import CalmButton from '../CalmButton/CalmButton.jsx';
 
 const { Engine, Render, Runner, World, Bodies, Body, Composite, Events, Mouse, MouseConstraint } = Matter;
 
@@ -1335,10 +1336,19 @@ export default function CognitiveForge() {
                 </div>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:13}}>
                   <span style={{fontSize:11,color:'var(--text-3)'}}>{text.length} chars</span>
-                  <motion.button className="btn btn-primary" onClick={handleExtract} disabled={isLoading||text.trim().length<5} whileHover={{scale:1.02}} whileTap={{scale:0.97}}>
-                    {isLoading?<span className="spinner"/>:<Sparkles size={13}/>}
-                    {isLoading?'Extracting…':'Forge the blocks'}
-                  </motion.button>
+                  <CalmButton
+                    as={motion.button}
+                    onClick={handleExtract}
+                    disabled={isLoading || text.trim().length < 5} 
+                    whileHover={{ scale: 1.02 }} 
+                    whileTap={{ scale: 0.97 }}
+                    className="px-8 py-3"
+                  >
+                    <div className="flex items-center gap-2">
+                       {isLoading ? <span className="spinner" /> : <Sparkles size={13} />}
+                       {isLoading ? 'Extracting…' : 'Forge the blocks'}
+                    </div>
+                  </CalmButton>
                 </div>
                 {error&&<p style={{marginTop:9,fontSize:12.5,color:'#fca5a5'}}>{error}</p>}
               </motion.div>
