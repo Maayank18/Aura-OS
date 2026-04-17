@@ -7,10 +7,10 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const PHASES = [
-  { label: 'Breathe in',  duration: 4000, scale: 1.55, color: '#00e5ff' },
-  { label: 'Hold',        duration: 2000, scale: 1.55, color: '#c4b5fd' },
-  { label: 'Breathe out', duration: 4000, scale: 1.0,  color: '#5eead4' },
-  { label: 'Hold',        duration: 2000, scale: 1.0,  color: '#c4b5fd' },
+  { label: 'Breathe in',  duration: 4000, scale: 1.55, color: 'var(--cyan)' },
+  { label: 'Hold',        duration: 2000, scale: 1.55, color: 'var(--purple-soft)' },
+  { label: 'Breathe out', duration: 4000, scale: 1.0,  color: 'var(--teal)' },
+  { label: 'Hold',        duration: 2000, scale: 1.0,  color: 'var(--purple-soft)' },
 ];
 
 const TOTAL_CYCLES  = 2;           // 2 full cycles = ~24 seconds
@@ -51,7 +51,7 @@ export default function SymptomInterruption({ onComplete, coachMessage }) {
       position: 'fixed', inset: 0, zIndex: 500,
       display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center',
-      background: 'rgba(2,9,21,0.97)', backdropFilter: 'blur(28px)',
+      background: 'var(--bg-glass-deep)', backdropFilter: 'blur(28px)',
       gap: 32,
     }}>
       {/* Coach message */}
@@ -62,15 +62,15 @@ export default function SymptomInterruption({ onComplete, coachMessage }) {
             animate={{ opacity: 1, y: 0 }}
             style={{
               maxWidth: 460, textAlign: 'center', padding: '16px 24px',
-              background: 'rgba(0,229,255,0.06)',
-              border: '1px solid rgba(0,229,255,0.2)',
+              background: 'var(--bg-glass)',
+              border: '1px solid var(--border)',
               borderRadius: 18,
             }}
           >
-            <p style={{ fontSize: 11, color: '#00e5ff', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>
+            <p style={{ fontSize: 11, color: 'var(--cyan)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>
               Aura Coach
             </p>
-            <p style={{ fontSize: 15, color: '#e8f4fb', lineHeight: 1.7 }}>{coachMessage}</p>
+            <p style={{ fontSize: 15, color: 'var(--text-1)', lineHeight: 1.7 }}>{coachMessage}</p>
           </motion.div>
         )}
       </AnimatePresence>
