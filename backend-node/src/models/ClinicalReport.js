@@ -55,6 +55,7 @@ const ClinicalReportSchema = new mongoose.Schema(
     vocalArousalScore:   { type:Number, min:1, max:10, default:5 },
     initialAnxietyQuery: { type:String, default:'', maxlength:3000 },
     aiStressSummary:     { type:String, default:'', maxlength:2500 },
+    aiBrief:             { type:Object, default: {} }, // 🆕 structured deep diagnosis
     riskLevel:           { type:String, enum:['watch','pre-burnout','acute-distress'], default:'watch' },
     shatteredWorryBlocks:{ type:[ReportWorrySchema],  default:[] },
     timelineMicroquests: { type:[ReportQuestSchema],  default:[] },

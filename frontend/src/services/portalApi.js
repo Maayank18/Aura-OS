@@ -15,8 +15,20 @@ const req = async (method, path, body, timeoutMs = API_TIMEOUT) => {
       signal: ctrl.signal,
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
-    const json = await res.json();
-    if (!res.ok || !json.success) throw new Error(json.error || `Request failed (${res.status})`);
+
+    // Check for empty or non-JSON responses before calling .json()
+    const text = await res.text();
+    let json = {};
+    try {
+      json = text ? JSON.parse(text) : {};
+    } catch (e) {
+      if (!res.ok) throw new Error(`Server error (${res.status}). The backend might be offline or crashing.`);
+      throw new Error(`Invalid response format from server.`);
+    }
+
+    if (!res.ok || !json.success) {
+      throw new Error(json.error || `Request failed (${res.status})`);
+    }
     return json;
   } catch (err) {
     if (err.name === 'AbortError') throw new Error('Request timed out — the AI is generating your report.');
@@ -42,4 +54,20 @@ export const clinicalApi = {
 
   // 14-day therapy brief
   therapyBrief:    (userId)   => req('POST', '/therapy-brief', { userId }, AI_TIMEOUT),
+
+  // Memory-safe blob download
+  downloadReportPdfBuffer: async (reportId, filename = 'AuraOS-Report.pdf') => {
+    const res = await fetch(`${BASE}/session-report/${reportId}/pdf`);
+    if (!res.ok) throw new Error(`Download failed (${res.status})`);
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  },
 };

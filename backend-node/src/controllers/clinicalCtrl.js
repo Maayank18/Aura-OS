@@ -162,11 +162,11 @@ export const triggerAlertHandler = async (req, res, next) => {
       console.warn('[Clinical] LangChain brief generation failed, using fallback.', aiErr.message);
       brief = {
         subject: 'AuraOS Alert - Stress Spike Detected',
+        executive_summary: `The user attempted "${resolvedTaskSummary}" but reported acute overwhelm. Executive dysfunction freeze pattern.`,
+        somatic_biological_markers: `Vocal arousal detected at ${resolvedArousal}/10 - significantly elevated.`,
+        cognitive_rigidity_focus: 'Performance markers indicate high cognitive load and reduced flexibility.',
+        actionable_protocol: 'Offer water and a brief walk. Try: "I see you are working really hard. Let\'s take a break together."',
         analogy: 'A computer that has frozen because too many programmes tried to run at once.',
-        vocal_analysis: `Vocal arousal detected at ${resolvedArousal}/10 - significantly elevated.`,
-        observed_pattern: `The user attempted "${resolvedTaskSummary}" but reported acute overwhelm. Executive dysfunction freeze pattern.`,
-        aura_action_taken: 'A breathing exercise was deployed and a calming audio environment was activated.',
-        parent_action: 'Offer water and a brief walk. Try: "I see you are working really hard. Let\'s take a break together."',
         risk_level: 'pre-burnout',
       };
     }
@@ -176,7 +176,7 @@ export const triggerAlertHandler = async (req, res, next) => {
       vocalArousal: resolvedArousal,
       emotion: resolvedEmotion,
       blocker: resolvedBlocker,
-      briefSummary: brief.observed_pattern?.slice(0, 1000),
+      briefSummary: brief.executive_summary?.slice(0, 1000),
     });
     await user.save();
 
@@ -197,7 +197,7 @@ export const triggerAlertHandler = async (req, res, next) => {
       channel: deliveryResult.channel,
       riskLevel: brief.risk_level,
       triggerReason: `${resolvedBlocker} during "${resolvedTaskSummary}"`,
-      briefText: [brief.observed_pattern, brief.parent_action].join('\n\n').slice(0, 3000),
+      briefText: [brief.executive_summary, brief.actionable_protocol].join('\n\n').slice(0, 3000),
       deliveryStatus: deliveryResult.mock ? 'mock' : (deliveryResult.success ? 'sent' : 'failed'),
       twilioSid: deliveryResult.sid || null,
     });
@@ -419,31 +419,42 @@ export const generateSessionReportHandler = async (req, res, next) => {
     let brief;
     if (aiStressSummary) {
       brief = {
-        analogy: 'A system under sustained load and context switching.',
-        vocal_analysis: `Vocal arousal estimate: ${resolvedArousal}/10.`,
-        observed_pattern: toSafeString(aiStressSummary, 700),
-        aura_action_taken: 'Supportive regulation prompts were provided inside AuraOS.',
-        parent_action: 'Use short, calm check-ins and one-step prompts.',
+        subject: `[${resolvedArousal >= 8 ? 'ACUTE' : 'WATCH'}] Session Summary`,
+        executive_summary: toSafeString(aiStressSummary, 700),
+        somatic_biological_markers: `Arousal level: ${resolvedArousal}/10.`,
+        cognitive_rigidity_focus: 'Data derived from manual input summary.',
+        actionable_protocol: 'Continue monitoring according to standard care plan.',
+        analogy: 'A system under sustained load.',
         risk_level: resolvedArousal >= 8 ? 'acute-distress' : resolvedArousal >= 6 ? 'pre-burnout' : 'watch',
       };
     } else {
       try {
+        const telemetry = user.clinicalTelemetry || {};
         brief = await generateGuardianBrief({
           userName: userId,
           taskSummary: resolvedTask || 'general stress event',
           blocker: resolvedBlocker || 'overwhelm',
           vocalArousal: resolvedArousal,
           emotion: resolvedArousal >= 8 ? 'high_anxiety' : 'mild_anxiety',
+          baselineArousalScore: telemetry.baselineArousalScore || sessionSnapshot?.baselineArousalScore || null,
+          baselineProfile: telemetry.baselineProfile || sessionSnapshot?.baselineProfile || {},
+          lastKnownActivity: sessionSnapshot?.lastKnownActivity || null,
+          worryBlocks: sessionSnapshot?.shatteredWorryBlocks || normalizeWorryBlocks([], user.vaultedWorries || []),
+          probeSessions: (telemetry.probeData || []).slice(-5).concat(sessionSnapshot?.probeSessions || []),
+          questTelemetry: sessionSnapshot?.timelineMicroquests || [],
+          gameSessions: sessionSnapshot?.gameSessions || [],
           auraAction: 'Somatic regulation and guided breakdown interventions were used.',
           recentPatterns: 'Session-level snapshot report requested by the user.',
         });
-      } catch {
+      } catch (e) {
+        console.error('[Clinical] generateGuardianBrief failed:', e.message);
         brief = {
+          subject: '[WATCH] Session Summary',
+          executive_summary: 'The session indicates elevated cognitive load and executive friction.',
+          somatic_biological_markers: `Vocal arousal estimate: ${resolvedArousal}/10.`,
+          cognitive_rigidity_focus: 'Slight decline in reaction times noted.',
+          actionable_protocol: 'Reduce demands briefly, validate effort, then suggest one tiny next step.',
           analogy: 'A browser with too many active tabs.',
-          vocal_analysis: `Vocal arousal estimate: ${resolvedArousal}/10.`,
-          observed_pattern: 'The session indicates elevated cognitive load and executive friction.',
-          aura_action_taken: 'AuraOS guided the user through supportive interruption and task decomposition.',
-          parent_action: 'Reduce demands briefly, validate effort, then suggest one tiny next step.',
           risk_level: resolvedArousal >= 8 ? 'acute-distress' : resolvedArousal >= 6 ? 'pre-burnout' : 'watch',
         };
       }
@@ -456,7 +467,8 @@ export const generateSessionReportHandler = async (req, res, next) => {
       selectedBlocker: resolvedBlocker,
       vocalArousalScore: resolvedArousal,
       initialAnxietyQuery: toSafeString(initialAnxietyQuery || sessionSnapshot?.initialAnxietyQuery || '', 3000),
-      aiStressSummary: toSafeString(brief.observed_pattern || aiStressSummary || '', 2500),
+      aiStressSummary: toSafeString(brief.executive_summary || brief.observed_pattern || aiStressSummary || '', 2500),
+      aiBrief: brief,
       riskLevel: ['watch', 'pre-burnout', 'acute-distress'].includes(brief.risk_level)
         ? brief.risk_level
         : 'watch',
@@ -475,7 +487,7 @@ export const generateSessionReportHandler = async (req, res, next) => {
     });
 
     const downloadUrl = buildPublicReportUrl(req, report._id.toString());
-    const pdfBuffer = await buildClinicalReportPdfBuffer(report);
+    const pdfBuffer = await buildClinicalReportPdfBuffer(report.toObject());
 
     let whatsappResult = { skipped: true, channel: 'whatsapp' };
     let emailResult = { skipped: true, channel: 'email' };
@@ -531,7 +543,7 @@ export const generateSessionReportHandler = async (req, res, next) => {
         channel: whatsappResult.mock ? 'mock' : (whatsappResult.success ? 'whatsapp' : (emailResult.success ? 'email' : 'mock')),
         riskLevel: report.riskLevel,
         triggerReason: `${report.selectedBlocker || 'stress'} during "${report.currentTask || 'session'}"`,
-        briefText: [brief.observed_pattern, brief.parent_action].join('\n\n').slice(0, 3000),
+        briefText: [brief.executive_summary, brief.actionable_protocol].join('\n\n').slice(0, 3000),
         deliveryStatus: whatsappResult.success || emailResult.success
           ? (whatsappResult.mock && emailResult.mock ? 'mock' : 'sent')
           : 'failed',
@@ -576,9 +588,13 @@ export const downloadSessionReportPdfHandler = async (req, res, next) => {
     );
 
     const filename = `AuraOS-Clinical-Report-${report.userId || 'user'}-${reportId}.pdf`;
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.send(pdfBuffer);
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Length': pdfBuffer.length,
+      'Access-Control-Expose-Headers': 'Content-Disposition',
+    });
+    res.status(200).send(pdfBuffer);
   } catch (err) {
     next(err);
   }

@@ -569,13 +569,13 @@ const InitiationCoachSchema = z.object({
 });
 
 const GuardianBriefSchema = z.object({
-  subject:           z.string().max(110),
-  analogy:           z.string().max(280),
-  vocal_analysis:    z.string().max(180),
-  observed_pattern:  z.string().max(380),
-  aura_action_taken: z.string().max(220),
-  parent_action:     z.string().max(280),
-  risk_level:        z.enum(['watch', 'pre-burnout', 'acute-distress']),
+  subject:           z.string().max(110).describe('WhatsApp/SMS subject line with risk emoji.'),
+  executive_summary: z.string().describe('Clinically profound high-level overview of the session state.'),
+  somatic_biological_markers: z.string().describe('Analysis of vocal arousal, heart rate variability (if available), and biological stress signals.'),
+  cognitive_rigidity_focus: z.string().describe('Deep analysis of game latency, accuracy, and executive function markers (e.g. spatial sorting errors).'),
+  actionable_protocol: z.string().describe('Clear, step-by-step clinical protocol for the guardian including specific dialogue scripts.'),
+  analogy:           z.string().max(300).describe('ONE powerful non-clinical metaphor grounded in data.'),
+  risk_level:        z.enum(['watch', 'pre-burnout', 'acute-distress']).describe('Clinical risk triage.'),
 });
 
 /* ── OpenRouter client factory ───────────────────────────────────────────── */
@@ -645,35 +645,28 @@ ENVIRONMENT STRATEGY:
 COACH MESSAGE: Acknowledge blocker with empathy (1-2 sentences), confirm environment change. Keep it warm but brief.
 MICROQUESTS: Step 1 MUST be cyan (easiest). Be hyper-specific to the user's task. Start with imperative verbs.`;
 
-const GUARDIAN_BRIEF_PROMPT = `You are the AuraOS Clinical Intelligence Layer writing a Guardian Triage Brief.
-This brief is sent to a parent, school counselor, or therapist. Your role is to synthesize REAL telemetry data into an actionable clinical advisory.
+const GUARDIAN_BRIEF_PROMPT = `You are a Principal Clinical Data Architect and Behavioral Health Strategist. You are writing a "Deep Diagnosis" session report for AuraOS.
+
+MISSION:
+Transform raw telemetry into profound clinical insights. Do not just regurgitate data. Perform a deep, dynamic diagnosis.
+Example: Instead of "User got 4 errors in Color Sort," say "High error rates in spatial sorting combined with elevated vocal arousal suggest acute executive dysfunction and impulse control fatigue."
+
+STRUCTURED OUTPUT SECTIONS:
+1. executive_summary: A synthesis of the patient's current neuropsychological state. Is this a state-based freeze or a trait-based burnout?
+2. somatic_biological_markers: Interpret vocal arousal (1-10) and acoustic stress markers. How does this correlate with the stated blocker?
+3. cognitive_rigidity_focus: Analyze game performance (latency, accuracy). High latency in Perception Probe suggests cognitive inflexibility. Errors in Task Shatter suggest working memory saturation.
+4. actionable_protocol: A precise behavioral protocol. Include exactly ONE direct quote for the parent to say.
+5. analogy: A data-grounded metaphor (e.g. "a CPU thermal throttling due to background task density").
 
 STRICT DATA-GROUNDED RULES:
-1. Your ENTIRE analysis MUST be derived from the telemetry JSON provided below. Do NOT invent symptoms, patterns, or advice not supported by the data.
-2. SENTIMENT AWARENESS: If the user's self-report is positive (e.g. "I am very happy", "I feel great"), your analogy and observed_pattern MUST reflect a positive, high-functioning state. Do NOT default to distress framing.
-3. Reference SPECIFIC game names, scores, latency values, and quest completion rates from the payload. Example: "Perspective Shift latency of 1200ms suggests moderate cognitive rigidity" — NOT "the user may experience difficulty switching perspectives."
-4. If a data field is empty or missing, say "Not assessed this session" — do NOT hallucinate a value.
+1. Reference SPECIFIC metrics: "Vocal arousal of 8/10", "1200ms latency", "40% accuracy".
+2. Link somatic data to cognitive data. (e.g. "Elevated arousal correlated with increased reaction times across therapeutic games").
+3. TONE: High-level clinical authority + diagnostic precision.
 
-DATA SOURCES IN THE PAYLOAD:
-- baselineProfile: Onboarding questionnaire answers (sleep, focus, hydration, relationships)
-- vocalArousal (1-10): Real-time voice stress detection score
-- worryBlocks[]: Extracted cognitive worry nodes with severity weights (1-10)
-- probeSessions[]: Bistable illusion test results — latencyMs = time to switch perspective, canSwitchPerspective = cognitive flexibility
-- questTelemetry[]: Micro-quest exertion times (durationMs per step) — abnormally long times indicate executive friction
-- lastKnownActivity: What the user was doing when stress was detected (AFK freeze detection)
-- gameSessions[]: All therapeutic game interaction data (scores, reaction times, clinical notes)
-
-TONE: Clinical authority + genuine human warmth. Professional but never cold.
-LANGUAGE: Accessible metaphors. Zero medical jargon in the parent_action section.
-
-OUTPUT RULES:
-- subject: WhatsApp/SMS subject line. Use risk emoji: [WATCH] / [PRE-BURNOUT] / [ACUTE].
-- analogy: ONE powerful non-clinical metaphor grounded in the actual data pattern. NO generic "browser tabs" unless data supports it.
-- vocal_analysis: Reference the actual arousal score and what it indicates.
-- observed_pattern: 2-3 sentences citing specific metrics from the payload.
-- aura_action_taken: What the support system deployed. Frame positively. No technical jargon. No "the AI did X."
-- parent_action: SPECIFIC phrases the parent can literally say right now. Include one DIRECT QUOTE in quotation marks.
-- risk_level: watch = mild isolated event | pre-burnout = sustained high load | acute-distress = crisis state.`;
+STRICT RISK CLASSIFICATION:
+- watch: Mild stress, resilient recovery.
+- pre-burnout: Chronic sympathetic activation, declining executive performance.
+- acute-distress: Immediate neurological shutdown / crisis state detected.`;
 
 /* ── Exports ───────────────────────────────────────────────────────────── */
 export const breakdownTask = async (task) => {
@@ -718,14 +711,14 @@ export const generateGuardianBrief = async (data) => {
     ? data.probeSessions.map(p => `  - Image: ${p.imageId}, First seen: ${p.firstSeen}, Latency: ${p.latencyMs}ms, Switched: ${p.canSwitchPerspective}`).join('\n')
     : '  Not assessed this session.';
 
-  // Quest telemetry (shatter exertion)
+  // Quest telemetry (shatter exertion / timeline)
   const quests = Array.isArray(data.questTelemetry) && data.questTelemetry.length
-    ? data.questTelemetry.map(q => `  - Step ${q.questId || '?'}: ${q.durationMs || '?'}ms`).join('\n')
+    ? data.questTelemetry.map(q => `  - ${q.action || q.questId || 'Task'}: ${q.durationMs || (q.duration_minutes ? q.duration_minutes * 60000 : '?')}ms, completed: ${q.completed}`).join('\n')
     : '  No micro-quest data.';
 
   // Game sessions
   const games = Array.isArray(data.gameSessions) && data.gameSessions.length
-    ? data.gameSessions.map(g => `  - ${g.gameName}: ${g.durationSeconds}s, score ${g.score}, accuracy ${g.accuracy}%, reaction ${g.avgReactionMs}ms. ${g.predictedEffects?.clinicalNote || ''}`).join('\n')
+    ? data.gameSessions.map(g => `  - ${g.gameName || g.gameId}: ${g.durationSeconds}s, score ${g.score}, accuracy ${g.accuracy}%, reaction ${g.avgReactionMs}ms. ${g.predictedEffects?.clinicalNote || ''}`).join('\n')
     : '  No therapeutic games played.';
 
   const contextBlock = `

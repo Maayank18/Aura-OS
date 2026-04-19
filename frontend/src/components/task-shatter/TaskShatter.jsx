@@ -329,11 +329,21 @@ function ReportOverlay({ onClose, reportInfo, error }) {
   const steps = ['Compiling session data', 'Generating AI summary', 'Building PDF', 'Dispatching to guardian'];
   const [step, setStep] = useState(0);
 
-  useEffect(() => {
-    if (reportInfo || error) return;
-    const t = setInterval(() => setStep((s) => Math.min(s + 1, steps.length - 1)), 1800);
-    return () => clearInterval(t);
-  }, [reportInfo, error]); // eslint-disable-line
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleDownload = async () => {
+    if (!reportInfo?._id || isDownloading) return;
+    setIsDownloading(true);
+    try {
+      const filename = `AuraOS-Report-${reportInfo._id.slice(-6)}.pdf`;
+      await clinicalApi.downloadReportPdfBuffer(reportInfo._id, filename);
+    } catch (e) {
+      console.error('[Download] Failed:', e);
+      alert('Download failed. Please try again.');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -387,13 +397,14 @@ function ReportOverlay({ onClose, reportInfo, error }) {
             {reportInfo.delivery?.email?.status === 'sent' && ' · Email dispatched'}
           </p>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
-            {reportInfo.downloadUrl && (
+            {reportInfo.reportId && (
               <button className="btn btn-primary"
-                onClick={() => window.open(reportInfo.downloadUrl, '_blank', 'noopener,noreferrer')} style={{ fontSize: 13 }}>
-                <FileText size={13} /> Open PDF
+                onClick={handleDownload} disabled={isDownloading} style={{ fontSize: 13 }}>
+                {isDownloading ? <div className="spinner" style={{ width: 12, height: 12 }} /> : <FileText size={13} />}
+                {isDownloading ? 'Downloading…' : 'Download PDF'}
               </button>
             )}
-            <button className="btn btn-secondary" onClick={onClose} style={{ fontSize: 13 }}>Done</button>
+            <button className="btn btn-secondary" onClick={onClose} disabled={isDownloading} style={{ fontSize: 13 }}>Done</button>
           </div>
         </div>
       )}

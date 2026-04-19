@@ -1270,8 +1270,14 @@ export default function CognitiveForge() {
         userId, source: 'manual', currentTask: 'Cognitive Forge session', vocalArousalScore: 5, sendToGuardian: false,
         sessionSnapshot: { initialAnxietyQuery: text, shatteredWorryBlocks: worries.map(w => ({ id: w.uuid || String(w.id), text: w.worry, weight: w.weight, status: w.status || 'active' })), gameSessions, notes: gameSessions.length ? `${gameSessions.map(s => `${s.gameName}(${s.durationSeconds}s,score:${s.score})`).join(', ')}.` : 'No games played.' }
       });
-      if (res.downloadUrl) window.open(res.downloadUrl, '_blank', 'noopener,noreferrer');
-      setReportMsg(`PDF ready · Risk: ${res.riskLevel}`);
+      
+      // Use the memory-safe download helper
+      if (res.reportId) {
+        setReportMsg('PDF ready · Downloading…');
+        const filename = `AuraOS-Forge-Report-${String(res.reportId).slice(-6)}.pdf`;
+        await clinicalApi.downloadReportPdfBuffer(res.reportId, filename);
+        setReportMsg(`Success · Risk: ${res.riskLevel}`);
+      }
       setTimeout(() => setReportMsg(null), 5000);
     } catch (e) {
       setReportMsg(`PDF failed: ${e.message}`);
