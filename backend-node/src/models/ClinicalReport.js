@@ -49,6 +49,9 @@ const DeliveryStatusSchema = new mongoose.Schema(
 const ClinicalReportSchema = new mongoose.Schema(
   {
     userId:              { type:String, required:true, index:true },
+    patientId:           { type:mongoose.Schema.Types.ObjectId, ref:'Patient', default:null, index:true },
+    guardianId:          { type:mongoose.Schema.Types.ObjectId, ref:'Guardian', default:null, index:true },
+    dateRangeDays:       { type:Number, min:1, max:90, default:null },
     source:              { type:String, enum:['panic','manual','auto'], default:'manual' },
     currentTask:         { type:String, default:'', maxlength:500 },
     selectedBlocker:     { type:String, default:'', maxlength:200 },
@@ -66,6 +69,8 @@ const ClinicalReportSchema = new mongoose.Schema(
       phone:    { type:String, default:'' },
       relation: { type:String, default:'' },
     },
+    patientIntakeSnapshot:  { type:Object, default:{} },
+    guardianIntakeSnapshot: { type:Object, default:{} },
     delivery: {
       whatsapp: { type:DeliveryStatusSchema, default:() => ({}) },
       email:    { type:DeliveryStatusSchema, default:() => ({}) },

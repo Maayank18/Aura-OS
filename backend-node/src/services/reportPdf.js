@@ -212,6 +212,13 @@ const DiagnosisBox = ({ title, text }) => (
   </View>
 );
 
+const ScoreLine = ({ label, value }) => (
+  <View style={{ flexDirection: 'row', justifyContent: 'space-between', borderBottom: 1, borderBottomColor: '#e2e8f0', paddingBottom: 4, marginBottom: 4 }}>
+    <Text style={{ fontSize: 9, color: colors.muted }}>{label}</Text>
+    <Text style={{ fontSize: 9, fontWeight: 700, color: colors.primary }}>{value}</Text>
+  </View>
+);
+
 const ClinicalReportDocument = ({ report }) => {
   const generatedAt = new Date(report.meta?.generatedAt || report.createdAt || Date.now()).toLocaleString('en-IN', {
     dateStyle: 'medium',
@@ -260,6 +267,14 @@ const ClinicalReportDocument = ({ report }) => {
             <Text style={styles.gridLabel}>Primary Blocker</Text>
             <Text style={styles.gridValue}>{report.selectedBlocker || 'Unspecified'}</Text>
           </View>
+          <View style={styles.gridItem}>
+            <Text style={styles.gridLabel}>Report Window</Text>
+            <Text style={styles.gridValue}>{report.dateRangeDays ? `${report.dateRangeDays} days` : 'Session'}</Text>
+          </View>
+          <View style={styles.gridItem}>
+            <Text style={styles.gridLabel}>Guardian</Text>
+            <Text style={styles.gridValue}>{report.guardian?.name || report.guardian?.email || 'Not linked'}</Text>
+          </View>
           <View style={[styles.gridItem, { width: '100%' }]}>
             <Text style={styles.gridLabel}>Active Engagement Task</Text>
             <Text style={styles.gridValue}>{report.currentTask || 'N/A'}</Text>
@@ -269,6 +284,30 @@ const ClinicalReportDocument = ({ report }) => {
         {/* Deep Diagnosis Sections */}
         <Section title="Executive Summary">
           <DiagnosisBox title="Clinical Interpretation" text={report.aiBrief?.executive_summary || report.aiStressSummary || 'No summary available.'} />
+        </Section>
+
+        <Section title="Patient Intake + Guardian Observations">
+          <DiagnosisBox title="Cross-Intake Correlation" text={report.aiBrief?.intake_correlations || 'Intake correlation data was not available for this report.'} />
+          {report.patientIntakeSnapshot?.derivedScores && (
+            <View style={styles.diagnosisCard}>
+              <Text style={styles.diagnosisTitle}>Patient Baseline Scores</Text>
+              {Object.entries(report.patientIntakeSnapshot.derivedScores).map(([key, value]) => (
+                <ScoreLine key={key} label={key} value={`${value}/10`} />
+              ))}
+            </View>
+          )}
+          {report.guardianIntakeSnapshot?.derivedScores && (
+            <View style={styles.diagnosisCard}>
+              <Text style={styles.diagnosisTitle}>Guardian Observation Scores</Text>
+              {Object.entries(report.guardianIntakeSnapshot.derivedScores).map(([key, value]) => (
+                <ScoreLine key={key} label={key} value={`${value}/10`} />
+              ))}
+            </View>
+          )}
+        </Section>
+
+        <Section title="Telemetry Correlations">
+          <DiagnosisBox title="Dynamic Synthesis" text={report.aiBrief?.telemetry_correlations || 'Telemetry correlation data was not available for this report.'} />
         </Section>
 
         <Section title="Neuro-Somatic Markers">
@@ -282,8 +321,12 @@ const ClinicalReportDocument = ({ report }) => {
         {/* Actionable Protocol */}
         <Section title="Clinical Protocol (Guardian Instructions)">
           <View style={styles.protocolCard}>
-            <Text style={styles.protocolText}>{report.aiBrief?.actionable_protocol || 'Monitor patient for signs of fatigue and provide hydration.'}</Text>
+            <Text style={styles.protocolText}>{report.aiBrief?.guardian_protocol || report.aiBrief?.actionable_protocol || 'Monitor patient for signs of fatigue and provide hydration.'}</Text>
           </View>
+        </Section>
+
+        <Section title="Protective Factors">
+          <DiagnosisBox title="Patient Strengths" text={report.aiBrief?.patient_strengths || 'Protective factors were not available in this report.'} />
         </Section>
 
         {/* Cognitive Forge Insights */}
@@ -317,9 +360,13 @@ export const buildClinicalReportPdfBuffer = async (report) => {
     ...report,
     aiBrief: report.aiBrief || {
       executive_summary: report.aiStressSummary,
+      intake_correlations: 'Legacy report: intake correlations were not stored.',
+      telemetry_correlations: 'Legacy report: telemetry correlations were not stored.',
       somatic_biological_markers: 'Vocal arousal detected at ' + report.vocalArousalScore + '/10.',
       cognitive_rigidity_focus: 'Performance data not fully analyzed in legacy report.',
       actionable_protocol: 'Check in with the patient using warm, supportive language.',
+      guardian_protocol: 'Check in with the patient using warm, supportive language.',
+      patient_strengths: 'Legacy report: strengths were not stored.',
     }
   };
 

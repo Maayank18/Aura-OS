@@ -571,9 +571,13 @@ const InitiationCoachSchema = z.object({
 const GuardianBriefSchema = z.object({
   subject:           z.string().max(110).describe('WhatsApp/SMS subject line with risk emoji.'),
   executive_summary: z.string().describe('Clinically profound high-level overview of the session state.'),
+  intake_correlations: z.string().describe('Specific synthesis of patient intake and guardian observational intake.'),
+  telemetry_correlations: z.string().describe('Specific cross-stream correlations across intake, games, acoustic arousal, worries, and task events.'),
   somatic_biological_markers: z.string().describe('Analysis of vocal arousal, heart rate variability (if available), and biological stress signals.'),
   cognitive_rigidity_focus: z.string().describe('Deep analysis of game latency, accuracy, and executive function markers (e.g. spatial sorting errors).'),
   actionable_protocol: z.string().describe('Clear, step-by-step clinical protocol for the guardian including specific dialogue scripts.'),
+  guardian_protocol: z.string().describe('Guardian-facing next actions grounded in the patient and guardian intake correlation.'),
+  patient_strengths: z.string().describe('Protective factors and strengths inferred from telemetry without exaggeration.'),
   analogy:           z.string().max(300).describe('ONE powerful non-clinical metaphor grounded in data.'),
   risk_level:        z.enum(['watch', 'pre-burnout', 'acute-distress']).describe('Clinical risk triage.'),
 });
@@ -648,20 +652,26 @@ MICROQUESTS: Step 1 MUST be cyan (easiest). Be hyper-specific to the user's task
 const GUARDIAN_BRIEF_PROMPT = `You are a Principal Clinical Data Architect and Behavioral Health Strategist. You are writing a "Deep Diagnosis" session report for AuraOS.
 
 MISSION:
-Transform raw telemetry into profound clinical insights. Do not just regurgitate data. Perform a deep, dynamic diagnosis.
+Transform raw intake + guardian observations + live telemetry into profound clinical insights. Do not just regurgitate data. Perform a deep, dynamic synthesis.
 Example: Instead of "User got 4 errors in Color Sort," say "High error rates in spatial sorting combined with elevated vocal arousal suggest acute executive dysfunction and impulse control fatigue."
+Required example style: "The guardian noted frequent night-time isolation, which correlates with the patient's severe cognitive rigidity scores in Perception Probe and elevated baseline stress intake."
 
 STRUCTURED OUTPUT SECTIONS:
 1. executive_summary: A synthesis of the patient's current neuropsychological state. Is this a state-based freeze or a trait-based burnout?
-2. somatic_biological_markers: Interpret vocal arousal (1-10) and acoustic stress markers. How does this correlate with the stated blocker?
-3. cognitive_rigidity_focus: Analyze game performance (latency, accuracy). High latency in Perception Probe suggests cognitive inflexibility. Errors in Task Shatter suggest working memory saturation.
-4. actionable_protocol: A precise behavioral protocol. Include exactly ONE direct quote for the parent to say.
-5. analogy: A data-grounded metaphor (e.g. "a CPU thermal throttling due to background task density").
+2. intake_correlations: Directly connect patient self-report with guardian observational MCQs. Use at least one "guardian noted X, patient reported Y" sentence when data exists.
+3. telemetry_correlations: Directly connect intake + guardian observations to game latency/accuracy, worry density, acoustic arousal, and stress spikes.
+4. somatic_biological_markers: Interpret vocal arousal (1-10) and acoustic stress markers. How does this correlate with the stated blocker?
+5. cognitive_rigidity_focus: Analyze game performance (latency, accuracy). High latency in Perception Probe suggests cognitive inflexibility. Rhythm Sync variance suggests timing dysregulation. Spark Canvas hesitation suggests inhibition.
+6. actionable_protocol / guardian_protocol: A precise behavioral protocol. Include exactly ONE direct quote for the guardian to say.
+7. patient_strengths: Identify protective factors from completed tasks, regulation attempts, successful game signals, or help-seeking.
+8. analogy: A data-grounded metaphor (e.g. "a CPU thermal throttling due to background task density").
 
 STRICT DATA-GROUNDED RULES:
 1. Reference SPECIFIC metrics: "Vocal arousal of 8/10", "1200ms latency", "40% accuracy".
 2. Link somatic data to cognitive data. (e.g. "Elevated arousal correlated with increased reaction times across therapeutic games").
-3. TONE: High-level clinical authority + diagnostic precision.
+3. Never write static boilerplate. Every paragraph must cite at least one provided datapoint or explicitly state a missing datapoint.
+4. Do not diagnose ADHD, panic disorder, depression, or PTSD. Use "consistent with", "suggests", or "may reflect".
+5. TONE: High-level clinical authority + diagnostic precision.
 
 STRICT RISK CLASSIFICATION:
 - watch: Mild stress, resilient recovery.
@@ -721,6 +731,26 @@ export const generateGuardianBrief = async (data) => {
     ? data.gameSessions.map(g => `  - ${g.gameName || g.gameId}: ${g.durationSeconds}s, score ${g.score}, accuracy ${g.accuracy}%, reaction ${g.avgReactionMs}ms. ${g.predictedEffects?.clinicalNote || ''}`).join('\n')
     : '  No therapeutic games played.';
 
+  const fmtAnswers = (intake, label) => {
+    const scores = intake?.derivedScores ? Object.entries(intake.derivedScores).map(([k, v]) => `${k}: ${v}/10`).join(', ') : 'no derived scores';
+    const answers = Array.isArray(intake?.answers) && intake.answers.length
+      ? intake.answers.map(a => `  - ${a.label || a.id}: ${a.value}/4`).join('\n')
+      : '  Not completed.';
+    return `${label} derived scores: ${scores}\n${answers}`;
+  };
+
+  const vocalEvents = Array.isArray(data.vocalStressEvents) && data.vocalStressEvents.length
+    ? data.vocalStressEvents.map(e => `  - ${e.arousalScore || '?'} /10 ${e.emotion || ''} during ${e.taskContext || 'unknown context'}`).join('\n')
+    : '  No recent vocal events.';
+
+  const spikes = Array.isArray(data.stressSpikes) && data.stressSpikes.length
+    ? data.stressSpikes.map(s => `  - ${s.vocalArousal || '?'} /10 trigger "${s.trigger || 'unknown'}", blocker "${s.blocker || 'unknown'}"`).join('\n')
+    : '  No recent stress spikes.';
+
+  const guardianAlerts = Array.isArray(data.guardianAlerts) && data.guardianAlerts.length
+    ? data.guardianAlerts.map(a => `  - ${a.riskLevel || 'watch'} via ${a.channel || 'unknown'}: ${a.triggerReason || 'alert event'}`).join('\n')
+    : '  No guardian alerts in range.';
+
   const contextBlock = `
 === TELEMETRY PAYLOAD ===
 
@@ -735,6 +765,12 @@ BASELINE AROUSAL (from intake): ${safe(data.baselineArousalScore)}
 ONBOARDING BASELINE PROFILE:
 ${bpLines}
 
+PATIENT 10-QUESTION INTAKE:
+${fmtAnswers(data.patientIntake, 'Patient intake')}
+
+GUARDIAN 5-QUESTION OBSERVATIONAL INTAKE:
+${fmtAnswers(data.guardianIntake, 'Guardian intake')}
+
 WORRY BLOCKS (Cognitive Forge):
 ${worries}
 
@@ -746,6 +782,15 @@ ${quests}
 
 THERAPEUTIC GAME SESSIONS:
 ${games}
+
+RECENT VOCAL STRESS EVENTS:
+${vocalEvents}
+
+CRISIS / SPIKE EVENTS:
+${spikes}
+
+GUARDIAN ALERT HISTORY:
+${guardianAlerts}
 
 AURA INTERVENTION: ${safe(data.auraAction, 'Somatic interruption deployed.')}
 24H PATTERN: ${safe(data.recentPatterns, 'No historical pattern available.')}

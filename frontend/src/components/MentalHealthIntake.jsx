@@ -32,7 +32,7 @@ export const PROFILES = {
     recommendedFeatures: [
       { label: 'Aura Voice',      detail: 'Emotion-adaptive AI that meets you mid-panic' },
       { label: 'Breathe Flow',    detail: '4-2-4 guided breathing to lower cortisol' },
-      { label: 'Squeeze Release', detail: 'Somatic tension release — no talking required' },
+      { label: 'Spark Canvas',    detail: 'Thirty-second sketching that turns raw feeling into a visual world' },
     ],
     // GAD-2 inspired
     questions: [
@@ -79,7 +79,7 @@ export const PROFILES = {
     primaryTab:  'shatter',
     recommendedFeatures: [
       { label: 'Task Shatterer', detail: 'Blocker-aware ADHD coach with body-double mode' },
-      { label: 'Number Dash',    detail: 'Schulte table — trains directed attention in 30-second rounds' },
+      { label: 'Rhythm Sync',    detail: 'Metronome tapping - trains timing precision and directed attention' },
       { label: 'Brown Noise',    detail: 'Scientifically-backed ADHD focus aid, built in' },
     ],
     // ASRS-lite inspired

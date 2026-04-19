@@ -9,6 +9,8 @@
 //   POST /api/clinical/therapy-brief    — Generate 14-day clinical PDF brief
 
 import UserState   from '../models/UserState.js';
+import Patient     from '../models/Patient.js';
+import Guardian    from '../models/Guardian.js';
 import AlertLog    from '../models/AlertLog.js';
 import ClinicalReport from '../models/ClinicalReport.js';
 import { generateGuardianBrief } from '../services/langchain.js';
@@ -86,6 +88,63 @@ const deliveryStatusFromResult = (result) => {
   if (result.mock) return { attempted: true, status: 'mock', sid: result.sid || null, error: null };
   if (result.success) return { attempted: true, status: 'sent', sid: result.sid || result.messageId || null, error: null };
   return { attempted: true, status: 'failed', sid: null, error: result.error || 'Delivery failed' };
+};
+
+const normalizeGuardianDays = (days) => {
+  const parsed = Number(days) || 7;
+  return [7, 14, 21].includes(parsed) ? parsed : 7;
+};
+
+const ensureGuardianPatientAccess = async (guardianId, patientId) => {
+  const guardian = await Guardian.findById(guardianId);
+  if (!guardian) throw new AppError('Guardian account not found.', 404);
+
+  const selectedPatientId = patientId || guardian.linkedPatientIds?.[0]?.toString();
+  if (!selectedPatientId) return { guardian, patient: null, guardianIntake: null };
+
+  const isLinked = (guardian.linkedPatientIds || []).some((id) => id.toString() === selectedPatientId);
+  if (!isLinked) throw new AppError('Guardian is not linked to this patient.', 403);
+
+  const patient = await Patient.findById(selectedPatientId).lean();
+  if (!patient) throw new AppError('Patient not found.', 404);
+
+  const guardianIntake = (guardian.guardianIntakes || []).find((intake) =>
+    intake.patientId.toString() === selectedPatientId
+  ) || null;
+
+  return { guardian, patient, guardianIntake };
+};
+
+const collectRecentGameSessions = (reports = []) => reports.flatMap((report) => [
+  ...(Array.isArray(report.gameSessions) ? report.gameSessions : []),
+  ...(Array.isArray(report.meta?.gameSessions) ? report.meta.gameSessions : []),
+]).filter(Boolean);
+
+const buildCrisisFeed = (alerts = [], telemetry = {}, includeBrief = false) => {
+  const spikeItems = (telemetry.stressSpikes || []).map((spike) => ({
+    id: `spike-${new Date(spike.timestamp).getTime()}-${spike.trigger || 'event'}`,
+    type: 'stress_spike',
+    timestamp: spike.timestamp,
+    riskLevel: spike.vocalArousal >= 8 ? 'acute-distress' : 'pre-burnout',
+    title: spike.trigger || 'Stress spike detected',
+    summary: spike.blocker || spike.emotion || 'Arousal spike recorded',
+    deliveryStatus: spike.alertSent ? 'sent' : 'logged',
+  }));
+
+  const alertItems = alerts.map((alert) => ({
+    id: alert._id?.toString?.() || `alert-${alert.sentAt}`,
+    type: 'guardian_alert',
+    timestamp: alert.sentAt || alert.createdAt,
+    riskLevel: alert.riskLevel,
+    title: alert.triggerReason || 'Guardian alert',
+    summary: includeBrief ? alert.briefText : 'Guardian notification event',
+    deliveryStatus: alert.deliveryStatus,
+    channel: alert.channel,
+  }));
+
+  return [...spikeItems, ...alertItems]
+    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+    .slice(0, 20);
 };
 
 // ── POST /api/clinical/trigger-alert ─────────────────────────────────────────
@@ -275,6 +334,177 @@ export const setGuardianHandler = async (req, res, next) => {
 
 // ── GET /api/clinical/dashboard/:userId ───────────────────────────────────────
 // Returns recharts-ready arrays for the Observer Portal.
+export const getGuardianDashboardHandler = async (req, res, next) => {
+  try {
+    const days = normalizeGuardianDays(req.query.days);
+    const { guardian, patient, guardianIntake } = await ensureGuardianPatientAccess(req.auth.id, req.query.patientId);
+
+    if (!patient) {
+      return res.json({ success: true, empty: true, patients: [] });
+    }
+
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const user = await UserState.findOne({ userId: patient.userStateId }).lean();
+    const telemetry = user?.clinicalTelemetry || {};
+    const reports = await ClinicalReport.find({ userId: patient.userStateId, createdAt: { $gte: since } }).sort({ createdAt: -1 }).limit(20).lean();
+    const alerts = await AlertLog.find({ userId: patient.userStateId, sentAt: { $gte: since } }).sort({ sentAt: -1 }).limit(20).lean();
+
+    const vocalRaw = (telemetry.vocalStressEvents || []).filter((e) => new Date(e.timestamp) > since);
+    const execRaw = (telemetry.executiveFunction || []).filter((e) => new Date(e.timestamp) > since);
+    const forgeRaw = (telemetry.forgeSessions || []).filter((e) => new Date(e.timestamp) > since);
+    const spikes = (telemetry.stressSpikes || []).filter((e) => new Date(e.timestamp) > since);
+    const gameSessions = collectRecentGameSessions(reports);
+    const consent = patient.privacyConsent || {};
+
+    const patients = await Patient.find({ _id: { $in: guardian.linkedPatientIds || [] } })
+      .select('displayName email userStateId patientIntake privacyConsent')
+      .lean();
+
+    res.json({
+      success: true,
+      days,
+      patient: {
+        id: patient._id.toString(),
+        displayName: patient.displayName,
+        email: patient.email,
+        userStateId: patient.userStateId,
+        patientIntakeCompleted: Boolean(patient.patientIntake?.completedAt),
+        guardianIntakeCompleted: Boolean(guardianIntake?.completedAt),
+        privacyConsent: consent,
+      },
+      patients: patients.map((p) => ({
+        id: p._id.toString(),
+        displayName: p.displayName,
+        email: p.email,
+        userStateId: p.userStateId,
+        patientIntakeCompleted: Boolean(p.patientIntake?.completedAt),
+        reportSharing: p.privacyConsent?.reportSharing !== false,
+      })),
+      intakes: {
+        patient: consent.reportSharing === false ? null : patient.patientIntake || null,
+        guardian: guardianIntake || null,
+      },
+      charts: {
+        vsiByDay: _groupByDay(vocalRaw, (e) => e.arousalScore || 5, 'vsi'),
+        execByDay: _groupByDayRatio(execRaw, 'efScore'),
+        forgeByDay: _groupByDay(forgeRaw, (e) => e.worryDensity || 5, 'density'),
+        gameFocusByDay: _groupByDay(gameSessions, (g) => g.predictedEffects?.focusScore || Math.round((g.accuracy || 0) / 10), 'focus'),
+      },
+      stats: {
+        tasksCompleted: execRaw.filter((e) => e.status === 'completed').length,
+        tasksAbandoned: execRaw.filter((e) => e.status === 'abandoned').length,
+        forgeSessions: forgeRaw.length,
+        avgVocalArousal: vocalRaw.length ? +(vocalRaw.reduce((s, e) => s + (e.arousalScore || 5), 0) / vocalRaw.length).toFixed(1) : 0,
+        stressSpikes: spikes.length,
+        gameSessions: gameSessions.length,
+        reportsGenerated: reports.length,
+      },
+      crisisFeed: buildCrisisFeed(alerts, { ...telemetry, stressSpikes: spikes }, consent.rawWorrySharing === true),
+      recentReports: reports.slice(0, 8).map((report) => ({
+        id: report._id.toString(),
+        createdAt: report.createdAt,
+        riskLevel: report.riskLevel,
+        summary: report.aiStressSummary,
+        dateRangeDays: report.dateRangeDays || null,
+      })),
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const generateGuardianDynamicReportHandler = async (req, res, next) => {
+  try {
+    const days = normalizeGuardianDays(req.body?.days);
+    const { guardian, patient, guardianIntake } = await ensureGuardianPatientAccess(req.auth.id, req.body?.patientId);
+    if (!patient) throw new AppError('No linked patient found.', 404);
+    if (patient.privacyConsent?.reportSharing === false) {
+      throw new AppError('Patient has not consented to guardian report sharing.', 403);
+    }
+
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const user = await UserState.findOne({ userId: patient.userStateId }).lean();
+    const telemetry = user?.clinicalTelemetry || {};
+    const alerts = await AlertLog.find({ userId: patient.userStateId, sentAt: { $gte: since } }).sort({ sentAt: -1 }).limit(20).lean();
+    const priorReports = await ClinicalReport.find({ userId: patient.userStateId, createdAt: { $gte: since } }).sort({ createdAt: -1 }).limit(20).lean();
+
+    const vocalEvents = (telemetry.vocalStressEvents || []).filter((e) => new Date(e.timestamp) > since);
+    const execEvents = (telemetry.executiveFunction || []).filter((e) => new Date(e.timestamp) > since);
+    const forgeEvents = (telemetry.forgeSessions || []).filter((e) => new Date(e.timestamp) > since);
+    const spikes = (telemetry.stressSpikes || []).filter((e) => new Date(e.timestamp) > since);
+    const gameSessions = collectRecentGameSessions(priorReports);
+    const avgArousal = vocalEvents.length
+      ? +(vocalEvents.reduce((sum, event) => sum + (event.arousalScore || 5), 0) / vocalEvents.length).toFixed(1)
+      : 5;
+
+    const brief = await generateGuardianBrief({
+      userName: patient.displayName || patient.userStateId,
+      taskSummary: `${days}-day guardian clinical review`,
+      blocker: execEvents.filter((e) => e.status === 'abandoned').length > execEvents.filter((e) => e.status === 'completed').length
+        ? 'repeated freeze or task abandonment pattern'
+        : 'mixed executive load with intermittent recovery',
+      vocalArousal: avgArousal,
+      emotion: avgArousal >= 7 ? 'high_anxiety' : avgArousal >= 5 ? 'mild_anxiety' : 'calm',
+      baselineArousalScore: telemetry.baselineArousalScore || patient.patientIntake?.derivedScores?.overallBaseline || null,
+      baselineProfile: telemetry.baselineProfile || {},
+      patientIntake: patient.patientIntake || {},
+      guardianIntake: guardianIntake || {},
+      lastKnownActivity: user?.lastActive || null,
+      worryBlocks: patient.privacyConsent?.rawWorrySharing === true
+        ? normalizeWorryBlocks([], user?.vaultedWorries || [])
+        : [],
+      probeSessions: (telemetry.probeData || []).slice(-8),
+      questTelemetry: execEvents.slice(-12),
+      gameSessions,
+      vocalStressEvents: vocalEvents.slice(-20),
+      stressSpikes: spikes.slice(-10),
+      guardianAlerts: alerts.slice(0, 10),
+      auraAction: `Guardian requested an on-demand ${days}-day synthesized clinical report.`,
+      recentPatterns: `${execEvents.length} task events, ${forgeEvents.length} forge sessions, ${gameSessions.length} game sessions, ${spikes.length} stress spikes, avg vocal arousal ${avgArousal}/10.`,
+    });
+
+    const report = await ClinicalReport.create({
+      userId: patient.userStateId,
+      patientId: patient._id,
+      guardianId: guardian._id,
+      dateRangeDays: days,
+      source: 'manual',
+      currentTask: `${days}-day guardian report`,
+      selectedBlocker: 'multi-stream clinical synthesis',
+      vocalArousalScore: avgArousal,
+      initialAnxietyQuery: `Guardian on-demand report for ${patient.displayName}`,
+      aiStressSummary: brief.executive_summary || '',
+      aiBrief: brief,
+      riskLevel: ['watch', 'pre-burnout', 'acute-distress'].includes(brief.risk_level) ? brief.risk_level : 'watch',
+      shatteredWorryBlocks: patient.privacyConsent?.rawWorrySharing === true ? normalizeWorryBlocks([], user?.vaultedWorries || []) : [],
+      gameSessions,
+      patientIntakeSnapshot: patient.patientIntake || {},
+      guardianIntakeSnapshot: guardianIntake || {},
+      guardian: {
+        name: guardian.displayName,
+        email: guardian.email,
+        relation: 'guardian',
+      },
+      meta: {
+        notes: `${days}-day guardian dynamic report. Patient consent raw worries: ${patient.privacyConsent?.rawWorrySharing === true}.`,
+        generatedAt: new Date(),
+        gameSessions,
+      },
+    });
+
+    res.json({
+      success: true,
+      reportId: report._id.toString(),
+      riskLevel: report.riskLevel,
+      aiStressSummary: report.aiStressSummary,
+      brief,
+      downloadUrl: buildPublicReportUrl(req, report._id.toString()),
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const getDashboardMetricsHandler = async (req, res, next) => {
   try {
     const { userId } = req.params;

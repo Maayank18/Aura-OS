@@ -8,6 +8,8 @@ const BASE        = '/api';       // Vite proxy → http://localhost:5001
 const AI_TIMEOUT  = 25_000;       // 25s — Gemini/Groq cold-start allowance
 const API_TIMEOUT = 8_000;        // 8s  — DB + health endpoints
 
+const VISION_TIMEOUT = 60_000;
+
 const req = async (method, path, body, timeoutMs = API_TIMEOUT) => {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -54,6 +56,8 @@ export const stateApi = {
 // ── Cognitive Forge ───────────────────────────────────────────────────────────
 export const forgeApi = {
   extract:       (text, userId)                   => postAI('/forge/extract', { text, userId }),
+  transformSketch: (imageBase64, strokeMetrics)   =>
+                   req('POST', '/forge/transform-sketch', { imageBase64, strokeMetrics }, VISION_TIMEOUT),
   destroy:       (userId, worryId)                => post('/forge/destroy', { userId, worryId }),
   vault:         (userId, worryId, worry, weight) =>
                    post('/forge/vault', { userId, worryId, worry, weight }),

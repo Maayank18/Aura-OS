@@ -11,6 +11,7 @@ import { globalErrorHandler } from './src/middleware/errorHandler.js';
 import forgeRoutes    from './src/routes/forge.js';
 import shatterRoutes  from './src/routes/shatter.js';
 import stateRoutes    from './src/routes/state.js';
+import authRoutes     from './src/routes/auth.js';
 import clinicalRoutes from './src/routes/clinical.js'; // 🌟 NEW
 
 const app  = express();
@@ -41,6 +42,7 @@ app.get('/health', (_, res) => res.json({
 app.use('/api/forge',    forgeRoutes);
 app.use('/api/shatter',  shatterRoutes);
 app.use('/api/state',    stateRoutes);
+app.use('/api/auth',     authRoutes);
 app.use('/api/clinical', clinicalRoutes); // 🌟 NEW
 
 app.use((req, res) => res.status(404).json({ success: false, error: `Route not found: ${req.method} ${req.path}` }));

@@ -10,6 +10,7 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import { extractWorries } from '../services/gemini.js';
+import { transformSketch } from '../services/sketchTransformer.js';
 import UserState from '../models/UserState.js';
 import { AppError } from '../middleware/errorHandler.js';
 
@@ -75,6 +76,24 @@ export const extractWorriesHandler = async (req, res) => {
 // Called when user drags a worry block into the Fireplace sensor.
 // Updates the worry status in DB to 'destroyed'.
 // This is the primary cathartic UX action – fire effect is on frontend.
+
+export const transformSketchHandler = async (req, res) => {
+  const { imageBase64, strokeMetrics } = req.body || {};
+
+  if (!imageBase64 || typeof imageBase64 !== 'string') {
+    throw new AppError('imageBase64 is required.', 400);
+  }
+
+  const result = await transformSketch({
+    imageBase64,
+    strokeMetrics: strokeMetrics || {},
+  });
+
+  res.json({
+    success: true,
+    result,
+  });
+};
 
 export const destroyWorryHandler = async (req, res) => {
   const { userId, worryId } = req.body;

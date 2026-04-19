@@ -5,11 +5,14 @@ import {
   triggerAlertHandler,
   logVocalStressHandler,
   setGuardianHandler,
+  getGuardianDashboardHandler,
+  generateGuardianDynamicReportHandler,
   getDashboardMetricsHandler,
   generateTherapyBriefHandler,
   generateSessionReportHandler,
   downloadSessionReportPdfHandler,
 } from '../controllers/clinicalCtrl.js';
+import { requireAuth, requireRole } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -25,6 +28,10 @@ router.put('/guardian',         asyncHandler(setGuardianHandler));
 
 // Observer Portal data
 router.get('/dashboard/:userId',asyncHandler(getDashboardMetricsHandler));
+
+// Authenticated guardian portal data
+router.get('/guardian/dashboard', requireAuth, requireRole('guardian'), asyncHandler(getGuardianDashboardHandler));
+router.post('/guardian/report', requireAuth, requireRole('guardian'), asyncHandler(generateGuardianDynamicReportHandler));
 
 // Therapy brief generation
 router.post('/therapy-brief',   asyncHandler(generateTherapyBriefHandler));

@@ -1,6 +1,8 @@
 // src/services/portalApi.js  🌟 NEW
 // API calls for Observer Portal and Clinical features.
 
+import { getAuthToken } from './authApi.js';
+
 const BASE        = '/api/clinical';
 const AI_TIMEOUT  = 30_000;
 const API_TIMEOUT = 8_000;
@@ -11,7 +13,10 @@ const req = async (method, path, body, timeoutMs = API_TIMEOUT) => {
   try {
     const res  = await fetch(`${BASE}${path}`, {
       method,
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(getAuthToken() ? { Authorization: `Bearer ${getAuthToken()}` } : {}),
+      },
       signal: ctrl.signal,
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
@@ -51,6 +56,12 @@ export const clinicalApi = {
 
   // Observer Portal data (recharts-ready)
   getDashboard:    (userId, days = 7) => req('GET', `/dashboard/${userId}?days=${days}`, null, API_TIMEOUT),
+
+  // Authenticated Guardian Portal
+  guardianDashboard: (patientId, days = 7) =>
+    req('GET', `/guardian/dashboard?days=${days}${patientId ? `&patientId=${patientId}` : ''}`, null, API_TIMEOUT),
+  guardianReport: (patientId, days = 14) =>
+    req('POST', '/guardian/report', { patientId, days }, AI_TIMEOUT),
 
   // 14-day therapy brief
   therapyBrief:    (userId)   => req('POST', '/therapy-brief', { userId }, AI_TIMEOUT),
