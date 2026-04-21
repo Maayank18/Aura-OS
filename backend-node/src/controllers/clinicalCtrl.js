@@ -250,8 +250,13 @@ export const triggerAlertHandler = async (req, res, next) => {
       await user.save();
     }
 
+    // Resolve patientId + guardianId for relational AlertLog linking
+    const patientRecord = await Patient.findOne({ userStateId: userId }).select('_id guardianId').lean();
+
     await AlertLog.create({
       userId,
+      patientId: patientRecord?._id || null,
+      guardianId: patientRecord?.guardianId || null,
       guardianPhone: resolvedGuardianPhone || null,
       channel: deliveryResult.channel,
       riskLevel: brief.risk_level,
@@ -347,7 +352,28 @@ export const getGuardianDashboardHandler = async (req, res, next) => {
     const user = await UserState.findOne({ userId: patient.userStateId }).lean();
     const telemetry = user?.clinicalTelemetry || {};
     const reports = await ClinicalReport.find({ userId: patient.userStateId, createdAt: { $gte: since } }).sort({ createdAt: -1 }).limit(20).lean();
-    const alerts = await AlertLog.find({ userId: patient.userStateId, sentAt: { $gte: since } }).sort({ sentAt: -1 }).limit(20).lean();
+    const alerts = await AlertLog.find({
+      $or: [
+        { userId: patient.userStateId, sentAt: { $gte: since } },
+        { patientId: patient._id, sentAt: { $gte: since } },
+      ],
+    }).sort({ sentAt: -1 }).limit(20).lean();
+
+    // Fetch mood logs directly from Patient model (not UserState)
+    const patientWithMood = await Patient.findById(patient._id).select('dailyMoodLogs').lean();
+    const moodLogs = (patientWithMood?.dailyMoodLogs || [])
+      .filter((l) => new Date(l.loggedAt) > since)
+      .sort((a, b) => new Date(a.loggedAt) - new Date(b.loggedAt))
+      .map((l) => ({
+        day: new Date(l.loggedAt).toISOString().slice(0, 10),
+        battery: l.battery,
+        brainFog: l.brainFog,
+        anxiety: l.anxiety,
+        energy: l.energy,
+        sociability: l.sociability,
+        compositeDistress: l.compositeDistress,
+        note: l.note || '',
+      }));
 
     const vocalRaw = (telemetry.vocalStressEvents || []).filter((e) => new Date(e.timestamp) > since);
     const execRaw = (telemetry.executiveFunction || []).filter((e) => new Date(e.timestamp) > since);
@@ -389,6 +415,7 @@ export const getGuardianDashboardHandler = async (req, res, next) => {
         execByDay: _groupByDayRatio(execRaw, 'efScore'),
         forgeByDay: _groupByDay(forgeRaw, (e) => e.worryDensity || 5, 'density'),
         gameFocusByDay: _groupByDay(gameSessions, (g) => g.predictedEffects?.focusScore || Math.round((g.accuracy || 0) / 10), 'focus'),
+        moodByDay: moodLogs,
       },
       stats: {
         tasksCompleted: execRaw.filter((e) => e.status === 'completed').length,
@@ -398,6 +425,7 @@ export const getGuardianDashboardHandler = async (req, res, next) => {
         stressSpikes: spikes.length,
         gameSessions: gameSessions.length,
         reportsGenerated: reports.length,
+        moodCheckins: moodLogs.length,
       },
       crisisFeed: buildCrisisFeed(alerts, { ...telemetry, stressSpikes: spikes }, consent.rawWorrySharing === true),
       recentReports: reports.slice(0, 8).map((report) => ({
@@ -717,7 +745,16 @@ export const generateSessionReportHandler = async (req, res, next) => {
     });
 
     const downloadUrl = buildPublicReportUrl(req, report._id.toString());
-    const pdfBuffer = await buildClinicalReportPdfBuffer(report.toObject());
+    // Fetch recent mood logs to include in PDF
+    const patientMood = report.patientId
+      ? await Patient.findById(report.patientId).select('dailyMoodLogs').lean()
+      : await Patient.findOne({ userStateId: userId }).select('dailyMoodLogs').lean();
+    const moodLogsForPdf = (patientMood?.dailyMoodLogs || [])
+      .sort((a, b) => new Date(b.loggedAt) - new Date(a.loggedAt))
+      .slice(0, 14)
+      .reverse()
+      .map((l) => ({ day: new Date(l.loggedAt).toISOString().slice(0, 10), battery: l.battery, brainFog: l.brainFog, anxiety: l.anxiety, energy: l.energy, sociability: l.sociability }));
+    const pdfBuffer = await buildClinicalReportPdfBuffer(report.toObject(), moodLogsForPdf);
 
     let whatsappResult = { skipped: true, channel: 'whatsapp' };
     let emailResult = { skipped: true, channel: 'email' };
@@ -810,7 +847,17 @@ export const downloadSessionReportPdfHandler = async (req, res, next) => {
     const report = await ClinicalReport.findById(reportId).lean();
     if (!report) throw new AppError('Report not found.', 404);
 
-    const pdfBuffer = await buildClinicalReportPdfBuffer(report);
+    // Fetch recent mood logs to hydrate the PDF
+    const patientMood = report.patientId
+      ? await Patient.findById(report.patientId).select('dailyMoodLogs').lean()
+      : await Patient.findOne({ userStateId: report.userId }).select('dailyMoodLogs').lean();
+    const moodLogsForPdf = (patientMood?.dailyMoodLogs || [])
+      .sort((a, b) => new Date(b.loggedAt) - new Date(a.loggedAt))
+      .slice(0, 14)
+      .reverse()
+      .map((l) => ({ day: new Date(l.loggedAt).toISOString().slice(0, 10), battery: l.battery, brainFog: l.brainFog, anxiety: l.anxiety, energy: l.energy, sociability: l.sociability }));
+
+    const pdfBuffer = await buildClinicalReportPdfBuffer(report, moodLogsForPdf);
 
     await ClinicalReport.updateOne(
       { _id: reportId },

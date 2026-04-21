@@ -68,7 +68,7 @@ export default function AuthPage() {
 
   return (
     <div style={{
-      minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      height: '100dvh', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center',
       background: 'var(--bg-root)', padding: '24px 16px',
       backgroundImage: `radial-gradient(ellipse 70% 50% at 50% 0%, ${isGuardian ? 'rgba(124,58,237,0.18)' : 'rgba(0,60,110,0.85)'}, transparent 60%)`,
     }}>
@@ -77,7 +77,7 @@ export default function AuthPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
         className="tg-surface"
-        style={{ width: '100%', maxWidth: 460, borderRadius: 28, padding: '40px 36px' }}
+        style={{ width: '100%', maxWidth: 460, borderRadius: 28, padding: '32px 28px' }}
       >
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 32 }}>
@@ -142,7 +142,7 @@ export default function AuthPage() {
 
         {/* Form */}
         <form onSubmit={handleSubmit}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {!isLogin && (
               <div>
                 <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-3)', display: 'block', marginBottom: 6, letterSpacing: '0.04em', textTransform: 'uppercase' }}>Name</label>

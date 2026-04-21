@@ -125,7 +125,20 @@ export default function PatientIntake() {
   const handleSaveIntake = async () => {
     setBusy(true); setError(null);
     try {
-      await authApi.patientIntake(QUESTIONS.map((qq) => answers[qq.id]), consent);
+      const res = await authApi.patientIntake(QUESTIONS.map((qq) => answers[qq.id]), consent);
+      
+      // Generate standard UI layout profile based on their baseline AI score
+      const score = res?.patientIntake?.derivedScores?.overallBaseline || 5;
+      const profile = score > 6 
+        ? { id: 'burnout', label: 'Overwhelm & Burnout', emoji: '🔥', glow: 'rgba(255,107,138,0.3)', bg: 'rgba(255,107,138,0.07)', border: 'rgba(255,107,138,0.22)', color: '#ff6b8a', primaryTab: 'forge' }
+        : { id: 'anxiety', label: 'Anxiety & Worry', emoji: '😰', glow: 'rgba(0,229,255,0.3)', bg: 'rgba(0,229,255,0.07)', border: 'rgba(0,229,255,0.22)', color: '#00e5ff', primaryTab: 'voice' };
+      
+      useStore.getState().setUserProfile({
+        ...profile,
+        severity: score > 7 ? 'Severe' : score > 4 ? 'Moderate' : 'Mild',
+        avgScore: score,
+      });
+
       setPhase('invite');
     } catch (err) {
       setError(err.message);
@@ -160,10 +173,10 @@ export default function PatientIntake() {
 
   return (
     <div style={{
-      minHeight: '100dvh', background: 'var(--bg-root)',
+      height: '100dvh', overflow: 'hidden', background: 'var(--bg-root)',
       backgroundImage: `radial-gradient(ellipse 70% 50% at 50% 0%, rgba(0,60,110,0.8), transparent 60%)`,
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      padding: '24px 16px',
+      padding: '16px',
     }}>
       {/* ── Progress bar ── */}
       {phase === 'intake' && (
@@ -190,14 +203,14 @@ export default function PatientIntake() {
 
       <motion.div
         className="tg-surface"
-        style={{ width: '100%', maxWidth: 580, borderRadius: 28, overflow: 'hidden' }}
+        style={{ width: '100%', maxWidth: 580, borderRadius: 24, overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}
         initial={{ opacity: 0, y: 32 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
       >
         {/* ── INTAKE PHASE ── */}
         {phase === 'intake' && (
-          <div style={{ padding: '36px 36px 32px' }}>
+          <div style={{ padding: '24px 28px', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             {/* Category label */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
               <span style={{
@@ -214,7 +227,7 @@ export default function PatientIntake() {
             </div>
 
             {/* Question slide */}
-            <div style={{ position: 'relative', overflow: 'hidden', minHeight: 380 }}>
+            <div style={{ position: 'relative', overflow: 'hidden', flex: 1, minHeight: 360 }}>
               <AnimatePresence mode="wait" custom={direction}>
                 <motion.div
                   key={q.id}
@@ -235,7 +248,7 @@ export default function PatientIntake() {
                   </div>
 
                   {/* Options */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div className="custom-scrollbar" style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '42vh', overflowY: 'auto', paddingRight: 6, paddingBottom: 4 }}>
                     {q.options.map((opt, val) => (
                       <motion.button
                         key={val}
@@ -243,7 +256,7 @@ export default function PatientIntake() {
                         whileHover={{ scale: 1.01 }}
                         whileTap={{ scale: 0.98 }}
                         className={`tg-answer ${sel?.value === val ? 'tg-answer-selected' : ''}`}
-                        style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}
+                        style={{ display: 'flex', gap: 12, alignItems: 'center' }}
                       >
                         <span style={{
                           width: 26, height: 26, borderRadius: 8, flexShrink: 0,
@@ -269,7 +282,7 @@ export default function PatientIntake() {
 
             {/* Navigation */}
             {error && <p style={{ fontSize: 13, color: '#fca5a5', marginBottom: 12 }}>{error}</p>}
-            <div style={{ display: 'flex', gap: 12, marginTop: 28 }}>
+            <div style={{ display: 'flex', gap: 12, marginTop: 20, flexShrink: 0 }}>
               <button
                 onClick={() => goTo(index - 1)}
                 disabled={index === 0}

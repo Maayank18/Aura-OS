@@ -60,5 +60,8 @@ export const authApi = {
   linkPatient: (inviteCode) => req('POST', '/guardian/link-patient', { inviteCode }),
   guardianIntake: (patientId, answers) => req('POST', `/guardian/patient/${patientId}/intake`, { answers }),
   guardianPatients: () => req('GET', '/guardian/patients'),
+  moodLog: (payload) => req('POST', '/patient/mood-log', payload),
+  getMoodLogs: (limit = 7) => req('GET', `/patient/mood-logs?limit=${limit}`),
   logout: clearAuthSession,
 };
+

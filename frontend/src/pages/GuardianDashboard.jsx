@@ -338,6 +338,26 @@ export default function GuardianDashboard() {
             </ResponsiveContainer>
           ) : <EmptyState message="No game session data yet" />}
         </Card>
+
+        {/* Daily mood trend */}
+        <Card title="Daily Mood Trend" subtitle="Patient 5-axis check-in scores (1–5 scale)">
+          {charts.moodByDay?.length ? (
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart data={charts.moodByDay} margin={{ top: 8, right: 4, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="2 4" stroke="rgba(255,255,255,0.04)" />
+                <XAxis dataKey="day" tick={{ fontSize: 10, fill: 'var(--text-3)' }} tickLine={false} axisLine={false} tickFormatter={(d) => d.slice(5)} />
+                <YAxis domain={[1, 5]} tick={{ fontSize: 10, fill: 'var(--text-3)' }} tickLine={false} axisLine={false} />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend wrapperStyle={{ fontSize: 10, paddingTop: 8 }} />
+                <Line type="monotone" dataKey="battery"  stroke="#22c55e" strokeWidth={2} dot={false} name="🔋 Battery" />
+                <Line type="monotone" dataKey="energy"   stroke="#00e5ff" strokeWidth={2} dot={false} name="⚡ Energy" />
+                <Line type="monotone" dataKey="anxiety"  stroke="#ff6b8a" strokeWidth={2} dot={false} name="🌪️ Anxiety" />
+                <Line type="monotone" dataKey="brainFog" stroke="#ffb300" strokeWidth={2} dot={false} name="🧠 Fog" />
+                <Line type="monotone" dataKey="sociability" stroke="#c4b5fd" strokeWidth={2} dot={false} name="🫳 Social" />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : <EmptyState message="No mood check-ins yet — encourage patient to use the daily mood tracker." />}
+        </Card>
       </div>
 
       {/* ── AI Report card ── */}

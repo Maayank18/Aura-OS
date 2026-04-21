@@ -11,10 +11,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, Wind, Zap, Shield } from 'lucide-react';
+import { Mic, Wind, Zap, LogOut, Smile } from 'lucide-react';
 import useStore from './store/useStore.js';
 import { shatterApi, stateApi } from './services/api.js';
-import { getStoredAccount } from './services/authApi.js';
+import { getStoredAccount, clearAuthSession } from './services/authApi.js';
 import ErrorBoundary        from './components/ErrorBoundary.jsx';
 import AuraVoice            from './components/aura-voice/AuraVoice.jsx';
 import CognitiveForge       from './components/cognitive-forge/CognitiveForge.jsx';
@@ -23,6 +23,7 @@ import ThemeSelector        from './components/ThemeSelector.jsx';
 import { PROFILES }         from './components/MentalHealthIntake.jsx';
 import CalmButton           from './components/CalmButton/CalmButton.jsx';
 import { DEFAULT_THEME, THEME_IDS } from './theme/themeOptions.js';
+import MoodCheckIn from './components/MoodCheckIn.jsx';
 
 /* ── Nav tabs ───────────────────────────────────────────────── */
 const TABS = [
@@ -72,6 +73,7 @@ export default function AuraShell() {
 
   const [initError,    setInitError]    = useState(false);
   const [resumeBanner, setResumeBanner] = useState(null);
+  const [moodOpen,     setMoodOpen]     = useState(false);
   const [theme, setTheme] = useState(() => {
     const storedTheme = localStorage.getItem('aura-theme');
     return storedTheme && THEME_IDS.has(storedTheme) ? storedTheme : DEFAULT_THEME;
@@ -146,6 +148,12 @@ export default function AuraShell() {
     clearUserProfile();
     profileTabSetRef.current = false;
     navigate('/patient/onboarding');
+  };
+
+  const handleLogout = () => {
+    clearAuthSession();
+    clearUserProfile();
+    navigate('/login', { replace: true });
   };
 
   /* ── Background gradient accent from user profile ── */
@@ -231,16 +239,26 @@ export default function AuraShell() {
           </div>
 
           {/* Right controls */}
-          <div className="topnav-actions">
+          <div className="topnav-actions flex items-center gap-3" style={{ position: 'relative' }}>
             {/* Profile badge — click to retake intake */}
             {userProfile && (
               <ProfileBadge profile={userProfile} onReset={handleRetakeIntake} />
             )}
-            <Link to="/guardian/login"
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 999, fontSize: 11, fontWeight: 700, color: '#c4b5fd', background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.2)', letterSpacing: '0.04em', textTransform: 'uppercase' }}
+            {/* Daily Mood Check-In toggle */}
+            <button onClick={() => setMoodOpen((o) => !o)}
+              title="Daily Mood Check-In"
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 999, fontSize: 11, fontWeight: 700, color: moodOpen ? '#00e5ff' : 'var(--text-3)', background: moodOpen ? 'rgba(0,229,255,0.1)' : 'rgba(255,255,255,0.04)', border: `1px solid ${moodOpen ? 'rgba(0,229,255,0.25)' : 'rgba(255,255,255,0.07)'}`, letterSpacing: '0.04em', textTransform: 'uppercase', cursor: 'pointer', transition: 'all 0.2s' }}
             >
-              <Shield size={12} /> Guardian
-            </Link>
+              😊 Mood
+            </button>
+            <AnimatePresence>
+              {moodOpen && <MoodCheckIn onClose={() => setMoodOpen(false)} />}
+            </AnimatePresence>
+            <button onClick={handleLogout}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 999, fontSize: 11, fontWeight: 700, color: '#ff6b8a', background: 'rgba(255,107,138,0.1)', border: '1px solid rgba(255,107,138,0.2)', letterSpacing: '0.04em', textTransform: 'uppercase', cursor: 'pointer' }}
+            >
+              <LogOut size={12} /> Logout
+            </button>
             <ThemeSelector currentTheme={theme} onChange={handleThemeChange} />
           </div>
         </nav>

@@ -49,6 +49,23 @@ const AuthMetaSchema = new mongoose.Schema(
   { _id: false }
 );
 
+// ── Daily Mood Check-In Schema ───────────────────────────────────────────────
+// Each log: 5-axis emoji mood scores (1=lowest, 5=highest)
+const MoodLogSchema = new mongoose.Schema(
+  {
+    loggedAt:    { type: Date, default: Date.now, index: true },
+    battery:     { type: Number, min: 1, max: 5, required: true }, // 🔋 Energy reserve
+    brainFog:    { type: Number, min: 1, max: 5, required: true }, // 🧠 Cognitive clarity (inverted: 5=clear)
+    anxiety:     { type: Number, min: 1, max: 5, required: true }, // 🌪️ Anxiety level
+    energy:      { type: Number, min: 1, max: 5, required: true }, // ⚡ Physical energy
+    sociability: { type: Number, min: 1, max: 5, required: true }, // 🫂 Social readiness
+    note:        { type: String, maxlength: 200, default: '' },    // Optional free-text note
+    // Derived composite: lower = better. (anxiety + brainFog) - (battery + energy + sociability)
+    compositeDistress: { type: Number, default: null },
+  },
+  { _id: true }
+);
+
 const PatientSchema = new mongoose.Schema(
   {
     email: { type: String, required: true, unique: true, lowercase: true, trim: true, index: true },
@@ -63,6 +80,8 @@ const PatientSchema = new mongoose.Schema(
     patientIntake: { type: PatientIntakeSchema, default: () => ({}) },
     privacyConsent: { type: PrivacyConsentSchema, default: () => ({}) },
     authMeta: { type: AuthMetaSchema, default: () => ({}) },
+    // Mood logs — kept rolling last 90 entries, trimmed on save
+    dailyMoodLogs: { type: [MoodLogSchema], default: [] },
   },
   { timestamps: true }
 );

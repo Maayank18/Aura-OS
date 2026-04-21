@@ -197,7 +197,7 @@ const savePatientIntake = async (req, res) => {
   };
   await user.save();
 
-  res.json({ success: true, patientIntake: patient.patientIntake, privacyConsent: patient.privacyConsent });
+  res.json({ success: true, patientIntake: patient.patientIntake, privacyConsent: patient.privacyConsent, account: serializePatient(patient) });
 };
 
 const generateInviteCode = async (req, res) => {
@@ -303,11 +303,53 @@ const getGuardianPatients = async (req, res) => {
   res.json({ success: true, patients });
 };
 
+// ── POST /api/auth/patient/mood-log ───────────────────────────────────────
+// Saves a 5-axis emoji mood log to the authenticated patient's account.
+const logMoodEntry = async (req, res) => {
+  const patient = req.auth.account;
+  const { battery, brainFog, anxiety, energy, sociability, note } = req.body;
+
+  const clamp = (v, min = 1, max = 5) => Math.min(max, Math.max(min, Math.round(Number(v) || min)));
+
+  const log = {
+    loggedAt:    new Date(),
+    battery:     clamp(battery),
+    brainFog:    clamp(brainFog),
+    anxiety:     clamp(anxiety),
+    energy:      clamp(energy),
+    sociability: clamp(sociability),
+    note:        String(note || '').trim().slice(0, 200),
+    compositeDistress: Math.round(((clamp(anxiety) + clamp(brainFog)) - (clamp(battery) + clamp(energy) + clamp(sociability))) * 10) / 10,
+  };
+
+  patient.dailyMoodLogs.push(log);
+  // Keep rolling 90-day window
+  const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+  patient.dailyMoodLogs = patient.dailyMoodLogs.filter(l => l.loggedAt > cutoff);
+  await patient.save();
+
+  res.json({ success: true, moodLog: log, totalLogs: patient.dailyMoodLogs.length });
+};
+
+// ── GET /api/auth/patient/mood-logs ─────────────────────────────────────
+// Returns the last N mood log entries for the authenticated patient.
+const getMoodLogs = async (req, res) => {
+  const patient = req.auth.account;
+  const limit = Math.min(30, Math.max(1, Number(req.query.limit) || 7));
+  const logs = (patient.dailyMoodLogs || [])
+    .sort((a, b) => new Date(b.loggedAt) - new Date(a.loggedAt))
+    .slice(0, limit)
+    .reverse(); // Chronological for chart rendering
+  res.json({ success: true, moodLogs: logs });
+};
+
 export {
   generateInviteCode,
   getGuardianPatients,
   linkPatient,
   login,
+  logMoodEntry,
+  getMoodLogs,
   me,
   registerGuardian,
   registerPatient,
