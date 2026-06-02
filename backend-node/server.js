@@ -49,7 +49,12 @@ app.use((req, res) => res.status(404).json({ success: false, error: `Route not f
 app.use(globalErrorHandler);
 
 const start = async () => {
-  await connectDB();
+  try {
+    await connectDB();
+  } catch (err) {
+    console.error('[DB] connectDB threw — server will start without DB:', err.message);
+  }
+
   app.listen(PORT, () => {
     console.log(`\n🧠 AuraOS backend-node on http://localhost:${PORT}`);
     console.log(`   Clinical API: http://localhost:${PORT}/api/clinical\n`);

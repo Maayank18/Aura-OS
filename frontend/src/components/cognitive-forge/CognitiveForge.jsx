@@ -1095,7 +1095,7 @@ function SessionReportPanel({ gameSessions, worries, destroyedCount, onDownloadR
   return (
     <motion.div initial={{opacity:0,y:12}} animate={{opacity:1,y:0}} style={{ marginTop:22, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:20, overflow:'hidden' }}>
       {/* Header */}
-      <button onClick={() => setExpanded(e=>!e)}
+      <div onClick={() => setExpanded(e=>!e)} role="button" tabIndex={0} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded(ex=>!ex); } }}
         style={{ width:'100%', padding:'16px 20px', display:'flex', justifyContent:'space-between', alignItems:'center', background:'none', border:'none', cursor:'pointer', textAlign:'left' }}>
         <div style={{ display:'flex', alignItems:'center', gap:12 }}>
           <span style={{ fontSize:15, fontWeight:800, color:'var(--text-1)', letterSpacing:'-0.03em' }}>🧬 Behavioral Health Profile</span>
@@ -1113,7 +1113,7 @@ function SessionReportPanel({ gameSessions, worries, destroyedCount, onDownloadR
           )}
           {expanded ? <ChevronUp size={15} color="var(--text-3)"/> : <ChevronDown size={15} color="var(--text-3)"/>}
         </div>
-      </button>
+      </div>
 
       <AnimatePresence>
         {expanded && (

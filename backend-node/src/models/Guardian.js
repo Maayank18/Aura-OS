@@ -63,7 +63,5 @@ const GuardianSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-GuardianSchema.index({ 'guardianIntakes.patientId': 1 });
-
 const Guardian = mongoose.model('Guardian', GuardianSchema);
 export default Guardian;

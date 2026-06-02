@@ -38,7 +38,23 @@ const req = async (method, path, body, timeoutMs = API_TIMEOUT) => {
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
 
-    const json = await res.json();
+    // Handle empty responses (e.g. when backend is down and proxy returns nothing)
+    const text = await res.text();
+    if (!text) {
+      throw new Error(
+        `Server returned an empty response (${res.status}). Is the backend running?`
+      );
+    }
+
+    let json;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      throw new Error(
+        `Server returned non-JSON response (${res.status}). The backend may be down or misconfigured.`
+      );
+    }
+
     if (!res.ok || !json.success) throw new Error(json.error || `Request failed (${res.status})`);
     if (json.token || json.account) setAuthSession(json);
     return json;
