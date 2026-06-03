@@ -223,6 +223,10 @@ const ClinicalReportDocument = ({ report, moodLogs }) => {
   const guardianName = report.guardian?.name || "Not linked";
   const guardianEmail = report.guardian?.email || "";
   const guardianRelation = report.guardian?.relation || "Guardian";
+  const patientName = report.patientSnapshot?.name || report.userId || "Unknown Patient";
+  const patientAge = report.patientSnapshot?.age ? `${report.patientSnapshot.age} yrs` : "Age not specified";
+  const patientEmail = report.patientSnapshot?.email || "No email";
+  const patientPhone = report.patientSnapshot?.phone || "No phone";
   return /* @__PURE__ */ React.createElement(Document, null, /* @__PURE__ */ React.createElement(Page, { size: "A4", style: styles.page },
     /* Header */
     /* @__PURE__ */ React.createElement(View, { style: styles.header },
@@ -233,6 +237,8 @@ const ClinicalReportDocument = ({ report, moodLogs }) => {
       /* @__PURE__ */ React.createElement(View, null,
         /* @__PURE__ */ React.createElement(Text, { style: styles.metaInfo }, "REPORT ID: ", String(report._id).slice(-8).toUpperCase()),
         /* @__PURE__ */ React.createElement(Text, { style: styles.metaInfo }, "DATE: ", generatedAt),
+        /* @__PURE__ */ React.createElement(Text, { style: [styles.metaInfo, { fontWeight: 700, color: colors.primary, marginTop: 4 }] }, "PATIENT: ", patientName, " (", patientAge, ")"),
+        /* @__PURE__ */ React.createElement(Text, { style: styles.metaInfo }, patientEmail, patientPhone ? " | " + patientPhone : ""),
         /* @__PURE__ */ React.createElement(Text, { style: [styles.metaInfo, { fontWeight: 700, color: colors.primary, marginTop: 4 }] }, "GUARDIAN: ", guardianName, guardianEmail ? " <" + guardianEmail + ">" : ""),
         /* @__PURE__ */ React.createElement(Text, { style: [styles.metaInfo, { color: colors.accent }] }, guardianRelation.toUpperCase())
       )
@@ -252,6 +258,7 @@ const ClinicalReportDocument = ({ report, moodLogs }) => {
     ),
     /* Clinical sections */
     /* @__PURE__ */ React.createElement(Section, { title: "Executive Summary" }, /* @__PURE__ */ React.createElement(DiagnosisBox, { title: "Clinical Interpretation", text: report.aiBrief?.executive_summary || report.aiStressSummary || "No summary available." })),
+    /* @__PURE__ */ React.createElement(Section, { title: "Activity Diagnostics & Neurological Breakdown" }, /* @__PURE__ */ React.createElement(DiagnosisBox, { title: "Session Activities", text: report.aiBrief?.activity_analysis || "Activity diagnostic data was not generated for this session." })),
     /* @__PURE__ */ React.createElement(Section, { title: "Patient Intake + Guardian Observations" }, /* @__PURE__ */ React.createElement(DiagnosisBox, { title: "Cross-Intake Correlation", text: report.aiBrief?.intake_correlations || "Intake correlation data was not available for this report." }), report.patientIntakeSnapshot?.derivedScores && /* @__PURE__ */ React.createElement(View, { style: styles.diagnosisCard }, /* @__PURE__ */ React.createElement(Text, { style: styles.diagnosisTitle }, "Patient Baseline Scores"), Object.entries(report.patientIntakeSnapshot.derivedScores).map(([key, value]) => /* @__PURE__ */ React.createElement(ScoreLine, { key, label: key, value: `${value}/10` }))), report.guardianIntakeSnapshot?.derivedScores && /* @__PURE__ */ React.createElement(View, { style: styles.diagnosisCard }, /* @__PURE__ */ React.createElement(Text, { style: styles.diagnosisTitle }, "Guardian Observation Scores"), Object.entries(report.guardianIntakeSnapshot.derivedScores).map(([key, value]) => /* @__PURE__ */ React.createElement(ScoreLine, { key, label: key, value: `${value}/10` })))),
     /* @__PURE__ */ React.createElement(Section, { title: "Telemetry Correlations" }, /* @__PURE__ */ React.createElement(DiagnosisBox, { title: "Dynamic Synthesis", text: report.aiBrief?.telemetry_correlations || "Telemetry correlation data was not available for this report." })),
     /* @__PURE__ */ React.createElement(Section, { title: "Neuro-Somatic Markers" }, /* @__PURE__ */ React.createElement(DiagnosisBox, { title: "Biological Stress Signal", text: report.aiBrief?.somatic_biological_markers || "Biological telemetry baseline within normal limits." })),
@@ -291,6 +298,7 @@ const buildClinicalReportPdfBuffer = async (report, moodLogs = []) => {
     ...report,
     aiBrief: report.aiBrief || {
       executive_summary: report.aiStressSummary,
+      activity_analysis: "Legacy report: activity analysis not stored.",
       intake_correlations: "Legacy report: intake correlations were not stored.",
       telemetry_correlations: "Legacy report: telemetry correlations were not stored.",
       somatic_biological_markers: "Vocal arousal detected at " + report.vocalArousalScore + "/10.",

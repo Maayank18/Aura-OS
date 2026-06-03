@@ -46,6 +46,7 @@ const DeliveryStatusSchema = new mongoose.Schema(
   { _id:false }
 );
 
+
 const ClinicalReportSchema = new mongoose.Schema(
   {
     userId:              { type:String, required:true, index:true },
@@ -69,12 +70,14 @@ const ClinicalReportSchema = new mongoose.Schema(
       phone:    { type:String, default:'' },
       relation: { type:String, default:'' },
     },
+    patientSnapshot:     {
+      name:     { type:String, default:'' },
+      age:      { type:Number, default:null },
+      email:    { type:String, default:'' },
+      phone:    { type:String, default:'' },
+    },
     patientIntakeSnapshot:  { type:Object, default:{} },
     guardianIntakeSnapshot: { type:Object, default:{} },
-    delivery: {
-      whatsapp: { type:DeliveryStatusSchema, default:() => ({}) },
-      email:    { type:DeliveryStatusSchema, default:() => ({}) },
-    },
     meta: {
       notes:       { type:String, default:'', maxlength:1000 },
       generatedAt: { type:Date, default:Date.now },

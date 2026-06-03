@@ -227,7 +227,7 @@ export default function PatientIntake() {
             </div>
 
             {/* Question slide */}
-            <div style={{ position: 'relative', overflow: 'hidden', flex: 1, minHeight: 360 }}>
+            <div style={{ position: 'relative', overflow: 'hidden', flex: 1, minHeight: 480 }}>
               <AnimatePresence mode="wait" custom={direction}>
                 <motion.div
                   key={q.id}
@@ -241,37 +241,44 @@ export default function PatientIntake() {
                 >
                   {/* Emoji + question */}
                   <div style={{ marginBottom: 24 }}>
-                    <div style={{ fontSize: 40, marginBottom: 12, lineHeight: 1 }}>{q.emoji}</div>
-                    <h2 style={{ fontSize: 'clamp(18px,2.5vw,22px)', fontWeight: 900, letterSpacing: '-0.03em', color: 'var(--text-1)', lineHeight: 1.3 }}>
+                    <div style={{ fontSize: 40, marginBottom: 16, lineHeight: 1 }}>{q.emoji}</div>
+                    <h2 style={{ fontSize: 'clamp(20px,2.5vw,26px)', fontWeight: 900, letterSpacing: '-0.03em', color: 'var(--text-1)', lineHeight: 1.3 }}>
                       {q.label}
                     </h2>
                   </div>
 
                   {/* Options */}
-                  <div className="custom-scrollbar" style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '42vh', overflowY: 'auto', paddingRight: 6, paddingBottom: 4 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                     {q.options.map((opt, val) => (
                       <motion.button
                         key={val}
                         onClick={() => pick(val)}
-                        whileHover={{ scale: 1.01 }}
+                        whileHover={{ scale: 1.01, backgroundColor: sel?.value === val ? `${color}25` : 'rgba(255,255,255,0.06)' }}
                         whileTap={{ scale: 0.98 }}
                         className={`tg-answer ${sel?.value === val ? 'tg-answer-selected' : ''}`}
-                        style={{ display: 'flex', gap: 12, alignItems: 'center' }}
+                        style={{ 
+                          display: 'flex', gap: 16, alignItems: 'center', textAlign: 'left',
+                          padding: '16px 20px', borderRadius: 16, width: '100%',
+                          background: sel?.value === val ? `${color}15` : 'rgba(255,255,255,0.02)',
+                          border: sel?.value === val ? `1px solid ${color}50` : '1px solid rgba(255,255,255,0.08)',
+                          boxShadow: sel?.value === val ? `0 4px 20px ${color}15` : 'none',
+                          transition: 'all 0.2s ease-out'
+                        }}
                       >
                         <span style={{
-                          width: 26, height: 26, borderRadius: 8, flexShrink: 0,
+                          width: 28, height: 28, borderRadius: 8, flexShrink: 0,
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: 12, fontWeight: 900, marginTop: 0,
-                          background: sel?.value === val ? `${color}20` : 'rgba(255,255,255,0.04)',
-                          color: sel?.value === val ? color : 'var(--text-3)',
-                          border: sel?.value === val ? `1px solid ${color}40` : '1px solid rgba(255,255,255,0.06)',
+                          fontSize: 13, fontWeight: 900,
+                          background: sel?.value === val ? `${color}` : 'rgba(255,255,255,0.06)',
+                          color: sel?.value === val ? '#000' : 'var(--text-3)',
+                          border: sel?.value === val ? 'none' : '1px solid rgba(255,255,255,0.1)',
                           transition: 'all 0.2s',
                         }}>
                           {val + 1}
                         </span>
-                        <span style={{ flex: 1, lineHeight: 1.5 }}>{opt}</span>
+                        <span style={{ flex: 1, fontSize: 15, fontWeight: sel?.value === val ? 600 : 500, color: sel?.value === val ? 'var(--text-1)' : 'var(--text-2)', lineHeight: 1.4 }}>{opt}</span>
                         {sel?.value === val && (
-                          <CheckCircle size={16} color={color} style={{ flexShrink: 0, marginTop: 2 }} />
+                          <CheckCircle size={18} color={color} style={{ flexShrink: 0 }} />
                         )}
                       </motion.button>
                     ))}

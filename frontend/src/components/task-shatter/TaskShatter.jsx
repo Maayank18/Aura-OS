@@ -35,25 +35,24 @@ const COLORS = [
   { id:'green',  border:'var(--green)', glow:'rgba(0,230,118,0.4)',   bg:'rgba(0,230,118,0.06)'   },
 ];
 
-// Research-backed blocker categories with env hints
 const BLOCKERS = [
   {
     id: 'too_noisy',
-    label: 'Too noisy / Distracted',
+    label: 'Sensory Overload (Distracted)',
     icon: Volume2,
     color: 'var(--cyan)',
-    desc: "Environment is loud and I can't focus",
+    desc: "External stimuli are blocking executive function. AI will prioritize environmental control.",
     envHint: 'brown_noise',
-    tip: 'Brown noise will activate',
+    tip: 'Acoustic masking (Brown Noise) activated',
   },
   {
     id: 'brain_fog',
-    label: 'Brain fog / Exhaustion',
+    label: 'Cognitive Fatigue (Brain Fog)',
     icon: Brain,
     color: 'var(--purple-soft)',
-    desc: 'My mind feels slow and heavy today',
+    desc: 'Internal energy depletion. AI will atomize tasks to eliminate cognitive load.',
     envHint: 'deep_focus_dark',
-    tip: 'Screen dims for focus',
+    tip: 'Optical strain reduction (Dark Mode) activated',
   },
 ];
 
@@ -798,7 +797,7 @@ export default function TaskShatter() {
     <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', background: 'var(--bg-root)' }}>
       <div style={{ ...dotGrid }} />
       <motion.div initial={{ opacity: 0, scale: 0.93, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={{ type: 'spring', stiffness: 220, damping: 22 }}
-        style={{ width: '100%', maxWidth: 500, padding: '0 22px', position: 'relative', zIndex: 1 }}>
+        style={{ width: '100%', maxWidth: 560, padding: '0 22px', position: 'relative', zIndex: 1 }}>
         <div style={{ background: 'var(--bg-glass-deep)', backdropFilter: 'blur(24px)', border: '1px solid var(--border)', borderRadius: 28, padding: '34px 30px' }}>
           {/* Task preview */}
           <div style={{ background: 'var(--bg-glass)', border: '1px solid var(--border)', borderRadius: 14, padding: '12px 16px', marginBottom: 24 }}>
@@ -835,13 +834,17 @@ export default function TaskShatter() {
                   }}>
                     <Icon size={20} color={b.color} />
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)', marginBottom: 3 }}>{b.label}</p>
-                    <p style={{ fontSize: 12, color: 'var(--text-3)' }}>{b.desc}</p>
+                  <div style={{ flex: 1, paddingRight: 10 }}>
+                    <p style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--text-1)', marginBottom: 4 }}>{b.label}</p>
+                    <p style={{ fontSize: 12.5, color: 'var(--text-2)', lineHeight: 1.4, marginBottom: 8 }}>{b.desc}</p>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: `${b.color}15`, padding: '4px 10px', borderRadius: 6 }}>
+                      <span style={{ fontSize: 11, color: b.color, fontWeight: 600, letterSpacing: '0.02em' }}>
+                        {b.tip}
+                      </span>
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3, flexShrink: 0 }}>
-                    <ChevronRight size={14} color="var(--text-3)" />
-                    <span style={{ fontSize: 9.5, color: b.color, opacity: 0.7, whiteSpace: 'nowrap' }}>{b.tip}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <ChevronRight size={18} color="var(--text-3)" />
                   </div>
                 </motion.button>
               );

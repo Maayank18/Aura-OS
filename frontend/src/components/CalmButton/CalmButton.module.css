@@ -12,19 +12,14 @@
   --cut: 0.1em;
   --spark: 4s;                /* Slowed down from 1.8s */
   
-  /* Adaptive nature-themed background */
+  /* Adaptive nature-themed background - more subtle */
   --bg:
     radial-gradient(
-      120% 120% at 126% 126%,
-      hsl(var(--hue) calc(var(--active) * 97%) 98% / calc(var(--active) * 0.9)) 40%,
-      transparent 50%
-    ) calc(100px - (var(--active) * 100px)) 0 / 100% 100% no-repeat, 
-    radial-gradient(
-      120% 120% at 120% 120%,
-      hsl(var(--hue) calc(var(--active) * 97%) 70% / calc(var(--active) * 1)) 30%,
+      120% 120% at 50% 120%,
+      hsl(var(--hue) calc(var(--active) * 60%) 60% / calc(var(--active) * 0.15)) 0%,
       transparent 70%
-    ) calc(100px - (var(--active) * 100px)) 0 / 100% 100% no-repeat,
-    hsl(var(--hue) calc(var(--active) * 100%) calc(12% - (var(--active) * 8%)));
+    ),
+    hsl(var(--hue) calc(var(--active) * 20%) calc(12% - (var(--active) * 4%)));
 
   background: var(--bg);
   font-size: inherit;
@@ -40,11 +35,11 @@
   border-radius: 2rem;
   position: relative;
   
-  /* Bioluminescent Glow */
+  /* Refined, professional glow */
   box-shadow:
-    0 0 calc(var(--active) * 4em) calc(var(--active) * 1.5em) hsl(var(--hue) 97% 61% / 0.35),
-    0 0.05em 0 0 hsl(var(--hue) calc(var(--active) * 97%) calc((var(--active) * 50%) + 30%)) inset,
-    0 -0.05em 0 0 hsl(var(--hue) calc(var(--active) * 97%) calc(var(--active) * 10%)) inset;
+    0 0 calc(var(--active) * 2em) calc(var(--active) * 0.5em) hsl(var(--hue) 60% 50% / 0.15),
+    0 1px 0 0 hsl(var(--hue) calc(var(--active) * 50%) 60% / 0.15) inset,
+    0 -1px 0 0 hsl(var(--hue) calc(var(--active) * 50%) 20% / 0.3) inset;
   
   transition: 
     box-shadow var(--transition) ease-in-out, 
@@ -167,12 +162,12 @@
   opacity: calc((var(--active)) + 0.4);
   background: conic-gradient(
     from 0deg,
-    transparent 0 340deg,
-    white 360deg
+    transparent 0 280deg,
+    hsl(var(--hue) 60% 60% / 0.3) 360deg
   );
   transition: opacity var(--transition) ease-in-out;
   /* Use ease-in-out as requested */
-  animation: rotate var(--spark) ease-in-out infinite both;
+  animation: rotate var(--spark) linear infinite both;
 }
 
 @keyframes rotate {

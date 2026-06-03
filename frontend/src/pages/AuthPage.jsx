@@ -88,32 +88,7 @@ export default function AuthPage() {
           </div>
         </div>
 
-        {/* Role switcher */}
-        <div style={{
-          display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4,
-          background: 'rgba(0,0,0,0.3)', borderRadius: 14, padding: 4, marginBottom: 28,
-          border: '1px solid rgba(255,255,255,0.04)',
-        }}>
-          {[
-            { r: 'patient', icon: Heart, label: 'Patient', color: '#00e5ff' },
-            { r: 'guardian', icon: Shield, label: 'Guardian', color: '#c4b5fd' },
-          ].map(({ r, icon: Icon, label, color }) => (
-            <button
-              key={r}
-              onClick={() => setRole(r)}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-                padding: '10px 0', borderRadius: 10, fontSize: 13, fontWeight: 700,
-                border: role === r ? `1px solid ${color}30` : '1px solid transparent',
-                background: role === r ? `${color}14` : 'transparent',
-                color: role === r ? color : 'var(--text-3)',
-                transition: 'all 0.2s', cursor: 'pointer',
-              }}
-            >
-              <Icon size={15} /> {label}
-            </button>
-          ))}
-        </div>
+        {/* Role switcher removed to prevent UX confusion (selected via navbar) */}
 
         {/* Title */}
         <AnimatePresence mode="wait">

@@ -508,6 +508,12 @@ export const generateGuardianDynamicReportHandler = async (req, res, next) => {
       gameSessions,
       patientIntakeSnapshot: patient.patientIntake || {},
       guardianIntakeSnapshot: guardianIntake || {},
+      patientSnapshot: {
+        name: patient.displayName || '',
+        age: patient.age || null,
+        email: patient.email || '',
+        phone: patient.phone || ''
+      },
       guardian: {
         name: guardian.displayName,
         email: guardian.email,
@@ -660,6 +666,8 @@ export const generateSessionReportHandler = async (req, res, next) => {
     if (!userId) throw new AppError('userId is required.', 400);
 
     const user = await UserState.findOrCreate(userId);
+    const patientRecord = await Patient.findOne({ userStateId: userId }).lean() || {};
+    
     const activeTask = taskId
       ? (user.taskHistory || []).find((t) => t.id === taskId)
       : (user.taskHistory || []).find((t) => t.status === 'active');
@@ -732,6 +740,12 @@ export const generateSessionReportHandler = async (req, res, next) => {
         : 'watch',
       shatteredWorryBlocks: normalizeWorryBlocks(sessionSnapshot?.shatteredWorryBlocks, user.vaultedWorries || []),
       timelineMicroquests: normalizeTimeline(sessionSnapshot?.timelineMicroquests, activeTask || null),
+      patientSnapshot: {
+        name: patientRecord.displayName || '',
+        age: patientRecord.age || null,
+        email: patientRecord.email || '',
+        phone: patientRecord.phone || ''
+      },
       guardian: {
         name: toSafeString(user.guardian?.name, 120),
         email: toSafeString(user.guardian?.email, 200),
