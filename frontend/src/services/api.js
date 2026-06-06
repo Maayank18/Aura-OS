@@ -101,4 +101,5 @@ export const pythonApi = {
 // ── Clinical API ──────────────────────────────────────────────────────────────
 export const clinicalApi = {
   generateRecoveryProtocol: (userId, reportData) => postAI('/clinical/recovery-protocol', { userId, reportData }),
+  voiceTriage: (transcriptChunk, wpm, averageVolume) => postAI('/clinical/voice-triage', { transcriptChunk, wpm, averageVolume }),
 };

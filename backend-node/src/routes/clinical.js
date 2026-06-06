@@ -14,6 +14,7 @@ import {
   generateRecoveryProtocolHandler,
   logGameSessionHandler,
 } from '../controllers/clinicalCtrl.js';
+import { voiceTriageHandler } from '../controllers/voiceTriageCtrl.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -23,6 +24,9 @@ router.post('/trigger-alert',   asyncHandler(triggerAlertHandler));
 
 // Vocal stress event logging (called by Python backend proxy or direct)
 router.post('/vocal-stress',    asyncHandler(logVocalStressHandler));
+
+// New Aura Voice Semantic Triage
+router.post('/voice-triage',    asyncHandler(voiceTriageHandler));
 
 // Game session telemetry logging
 router.post('/game-session',    asyncHandler(logGameSessionHandler));

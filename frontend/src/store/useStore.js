@@ -3,7 +3,7 @@
 // Extended with userProfile for mental-health personalization.
 
 import { create } from 'zustand';
-import { stateApi } from '../services/api.js';
+import { stateApi, clinicalApi } from '../services/api.js';
 
 // ── Safely load persisted profile from localStorage ──────────
 // Runs once at module init; errors silently so a corrupted
@@ -232,6 +232,22 @@ const useStore = create((set, get) => ({
   setAuraResponse: (r) => set({ auraResponse: r }),
   setAudioMuted:   (v) => set({ audioMuted: v }),
   setAuraSpeaking: (v) => set({ isAuraSpeaking: v }),
+
+  dispatchVoiceTelemetry: async (transcriptChunk, wpm, averageVolume) => {
+    try {
+      const result = await clinicalApi.voiceTriage(transcriptChunk, wpm, averageVolume);
+      if (result && result.data) {
+        set({
+          auraEmotion: result.data.stressTier === 'PANIC_FREEZE' ? 'high_anxiety' 
+                     : result.data.stressTier === 'ELEVATED' ? 'mild_anxiety' 
+                     : 'calm',
+          auraResponse: result.data.groundingResponse
+        });
+      }
+    } catch (error) {
+      console.error("Voice triage telemetry failed:", error);
+    }
+  },
 }));
 
 export default useStore;
