@@ -132,20 +132,20 @@ STRICT RISK CLASSIFICATION:
 /* ── Exports ───────────────────────────────────────────────────────────── */
 export const breakdownTask = async (task) => {
   const model = makeModel(MicroQuestSchema, 'generate_microquests');
-  console.log(\`[LangChain-OpenRouter] Standard breakdown...\`);
+  console.log(`[LangChain-OpenRouter] Standard breakdown...`);
   const result = await model.invoke([
     new SystemMessage(STANDARD_SHATTER_PROMPT),
-    new HumanMessage(\`Break this task into micro-steps: "\${task}"\`),
+    new HumanMessage(`Break this task into micro-steps: "\${task}"`),
   ]);
   return result.microquests;
 };
 
 export const coachBreakdown = async (task, blocker) => {
   const model = makeModel(InitiationCoachSchema, 'initiation_coach');
-  console.log(\`[LangChain-OpenRouter] Coach breakdown...\`);
+  console.log(`[LangChain-OpenRouter] Coach breakdown...`);
   return await model.invoke([
     new SystemMessage(INITIATION_COACH_PROMPT),
-    new HumanMessage(\`Task: "\${task}"\nBlocker: "\${blocker || 'overwhelm'}"\`),
+    new HumanMessage(`Task: "\${task}"\nBlocker: "\${blocker || 'overwhelm'}"`),
   ]);
 };
 
@@ -159,50 +159,50 @@ export const generateGuardianBrief = async (data) => {
   // Baseline profile
   const bp = data.baselineProfile || {};
   const bpLines = Object.keys(bp).length
-    ? Object.entries(bp).map(([k, v]) => \`  \${k}: \${v}\`).join('\n')
+    ? Object.entries(bp).map(([k, v]) => `  \${k}: \${v}`).join('\n')
     : '  Not completed.';
 
   // Worry blocks
   const worries = Array.isArray(data.worryBlocks) && data.worryBlocks.length
-    ? data.worryBlocks.slice(0, 8).map(w => \`  - "\${w.text}" (weight: \${w.weight}/10, \${w.status})\`).join('\n')
+    ? data.worryBlocks.slice(0, 8).map(w => `  - "\${w.text}" (weight: \${w.weight}/10, \${w.status})`).join('\n')
     : '  None extracted this session.';
 
   // Probe sessions (cognitive flexibility)
   const probes = Array.isArray(data.probeSessions) && data.probeSessions.length
-    ? data.probeSessions.map(p => \`  - Image: \${p.imageId}, First seen: \${p.firstSeen}, Latency: \${p.latencyMs}ms, Switched: \${p.canSwitchPerspective}\`).join('\n')
+    ? data.probeSessions.map(p => `  - Image: \${p.imageId}, First seen: \${p.firstSeen}, Latency: \${p.latencyMs}ms, Switched: \${p.canSwitchPerspective}`).join('\n')
     : '  Not assessed this session.';
 
   // Quest telemetry (shatter exertion / timeline)
   const quests = Array.isArray(data.questTelemetry) && data.questTelemetry.length
-    ? data.questTelemetry.map(q => \`  - \${q.action || q.questId || 'Task'}: \${q.durationMs || (q.duration_minutes ? q.duration_minutes * 60000 : '?')}ms, completed: \${q.completed}\`).join('\n')
+    ? data.questTelemetry.map(q => `  - \${q.action || q.questId || 'Task'}: \${q.durationMs || (q.duration_minutes ? q.duration_minutes * 60000 : '?')}ms, completed: \${q.completed}`).join('\n')
     : '  No micro-quest data.';
 
   // Game sessions
   const games = Array.isArray(data.gameSessions) && data.gameSessions.length
-    ? data.gameSessions.map(g => \`  - \${g.gameName || g.gameId}: \${g.durationSeconds}s, score \${g.score}, accuracy \${g.accuracy}%, reaction \${g.avgReactionMs}ms. \${g.predictedEffects?.clinicalNote || ''}\`).join('\n')
+    ? data.gameSessions.map(g => `  - \${g.gameName || g.gameId}: \${g.durationSeconds}s, score \${g.score}, accuracy \${g.accuracy}%, reaction \${g.avgReactionMs}ms. \${g.predictedEffects?.clinicalNote || ''}`).join('\n')
     : '  No therapeutic games played.';
 
   const fmtAnswers = (intake, label) => {
-    const scores = intake?.derivedScores ? Object.entries(intake.derivedScores).map(([k, v]) => \`\${k}: \${v}/10\`).join(', ') : 'no derived scores';
+    const scores = intake?.derivedScores ? Object.entries(intake.derivedScores).map(([k, v]) => `\${k}: \${v}/10`).join(', ') : 'no derived scores';
     const answers = Array.isArray(intake?.answers) && intake.answers.length
-      ? intake.answers.map(a => \`  - \${a.label || a.id}: \${a.value}/4\`).join('\n')
+      ? intake.answers.map(a => `  - \${a.label || a.id}: \${a.value}/4`).join('\n')
       : '  Not completed.';
-    return \`\${label} derived scores: \${scores}\n\${answers}\`;
+    return `\${label} derived scores: \${scores}\n\${answers}`;
   };
 
   const vocalEvents = Array.isArray(data.vocalStressEvents) && data.vocalStressEvents.length
-    ? data.vocalStressEvents.map(e => \`  - \${e.arousalScore || '?'} /10 \${e.emotion || ''} during \${e.taskContext || 'unknown context'}\`).join('\n')
+    ? data.vocalStressEvents.map(e => `  - \${e.arousalScore || '?'} /10 \${e.emotion || ''} during \${e.taskContext || 'unknown context'}`).join('\n')
     : '  No recent vocal events.';
 
   const spikes = Array.isArray(data.stressSpikes) && data.stressSpikes.length
-    ? data.stressSpikes.map(s => \`  - \${s.vocalArousal || '?'} /10 trigger "\${s.trigger || 'unknown'}", blocker "\${s.blocker || 'unknown'}"\`).join('\n')
+    ? data.stressSpikes.map(s => `  - \${s.vocalArousal || '?'} /10 trigger "\${s.trigger || 'unknown'}", blocker "\${s.blocker || 'unknown'}"`).join('\n')
     : '  No recent stress spikes.';
 
   const guardianAlerts = Array.isArray(data.guardianAlerts) && data.guardianAlerts.length
-    ? data.guardianAlerts.map(a => \`  - \${a.riskLevel || 'watch'} via \${a.channel || 'unknown'}: \${a.triggerReason || 'alert event'}\`).join('\n')
+    ? data.guardianAlerts.map(a => `  - \${a.riskLevel || 'watch'} via \${a.channel || 'unknown'}: \${a.triggerReason || 'alert event'}`).join('\n')
     : '  No guardian alerts in range.';
 
-  const contextBlock = \`
+  const contextBlock = `
 === TELEMETRY PAYLOAD ===
 
 PATIENT: \${safe(data.userName)}
@@ -245,11 +245,11 @@ GUARDIAN ALERT HISTORY:
 
 AURA INTERVENTION: \${safe(data.auraAction, 'Somatic interruption deployed.')}
 24H PATTERN: \${safe(data.recentPatterns, 'No historical pattern available.')}
-\`.trim();
+`.trim();
 
-  console.log(\`[LangChain-OpenRouter] Guardian brief for: \${data.userName}\`);
+  console.log(`[LangChain-OpenRouter] Guardian brief for: \${data.userName}`);
   return await model.invoke([
     new SystemMessage(GUARDIAN_BRIEF_PROMPT),
-    new HumanMessage(\`Generate the Guardian Triage Brief based ONLY on this telemetry:\n\n\${contextBlock}\`),
+    new HumanMessage(`Generate the Guardian Triage Brief based ONLY on this telemetry:\n\n\${contextBlock}`),
   ]);
 };

@@ -13,6 +13,7 @@ import Patient     from '../models/Patient.js';
 import Guardian    from '../models/Guardian.js';
 import AlertLog    from '../models/AlertLog.js';
 import ClinicalReport from '../models/ClinicalReport.js';
+import { ClientUserModel, GuardianUserModel } from '../models/User.js';
 import { generateGuardianBrief } from '../services/langchain.js';
 import { sendGuardianAlert }     from '../services/twilio.js';
 import { sendGuardianReportEmail } from '../services/email.js';
@@ -96,16 +97,28 @@ const normalizeGuardianDays = (days) => {
 };
 
 const ensureGuardianPatientAccess = async (guardianId, patientId) => {
-  const guardian = await Guardian.findById(guardianId);
+  let guardian = await GuardianUserModel.findById(guardianId);
+  let isNewModel = true;
+  if (!guardian) {
+    guardian = await Guardian.findById(guardianId);
+    isNewModel = false;
+  }
   if (!guardian) throw new AppError('Guardian account not found.', 404);
 
-  const selectedPatientId = patientId || guardian.linkedPatientIds?.[0]?.toString();
+  const linkedIds = isNewModel
+    ? (guardian.linkedClientIds || [])
+    : (guardian.linkedPatientIds || []);
+
+  const selectedPatientId = patientId || linkedIds[0]?.toString();
   if (!selectedPatientId) return { guardian, patient: null, guardianIntake: null };
 
-  const isLinked = (guardian.linkedPatientIds || []).some((id) => id.toString() === selectedPatientId);
+  const isLinked = linkedIds.some((id) => id.toString() === selectedPatientId);
   if (!isLinked) throw new AppError('Guardian is not linked to this patient.', 403);
 
-  const patient = await Patient.findById(selectedPatientId).lean();
+  let patient = await ClientUserModel.findById(selectedPatientId).lean();
+  if (!patient) {
+    patient = await Patient.findById(selectedPatientId).lean();
+  }
   if (!patient) throw new AppError('Patient not found.', 404);
 
   const guardianIntake = (guardian.guardianIntakes || []).find((intake) =>
@@ -251,7 +264,7 @@ export const triggerAlertHandler = async (req, res, next) => {
     }
 
     // Resolve patientId + guardianId for relational AlertLog linking
-    const patientRecord = await Patient.findOne({ userStateId: userId }).select('_id guardianId').lean();
+    const patientRecord = await ClientUserModel.findById(userId).select('_id guardianId').lean() || await Patient.findOne({ userStateId: userId }).select('_id guardianId').lean();
 
     await AlertLog.create({
       userId,
@@ -349,18 +362,22 @@ export const getGuardianDashboardHandler = async (req, res, next) => {
     }
 
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-    const user = await UserState.findOne({ userId: patient.userStateId }).lean();
+    const userStateId = patient.userStateId || patient._id.toString();
+    const user = await UserState.findOne({ userId: userStateId }).lean();
     const telemetry = user?.clinicalTelemetry || {};
-    const reports = await ClinicalReport.find({ userId: patient.userStateId, createdAt: { $gte: since } }).sort({ createdAt: -1 }).limit(20).lean();
+    const reports = await ClinicalReport.find({ userId: userStateId, createdAt: { $gte: since } }).sort({ createdAt: -1 }).limit(20).lean();
     const alerts = await AlertLog.find({
       $or: [
-        { userId: patient.userStateId, sentAt: { $gte: since } },
+        { userId: userStateId, sentAt: { $gte: since } },
         { patientId: patient._id, sentAt: { $gte: since } },
       ],
     }).sort({ sentAt: -1 }).limit(20).lean();
 
-    // Fetch mood logs directly from Patient model (not UserState)
-    const patientWithMood = await Patient.findById(patient._id).select('dailyMoodLogs').lean();
+    // Fetch mood logs directly from ClientUserModel or Patient model
+    let patientWithMood = await ClientUserModel.findById(patient._id).select('dailyMoodLogs').lean();
+    if (!patientWithMood) {
+      patientWithMood = await Patient.findById(patient._id).select('dailyMoodLogs').lean();
+    }
     const moodLogs = (patientWithMood?.dailyMoodLogs || [])
       .filter((l) => new Date(l.loggedAt) > since)
       .sort((a, b) => new Date(a.loggedAt) - new Date(b.loggedAt))
@@ -382,27 +399,35 @@ export const getGuardianDashboardHandler = async (req, res, next) => {
     const gameSessions = collectRecentGameSessions(reports);
     const consent = patient.privacyConsent || {};
 
-    const patients = await Patient.find({ _id: { $in: guardian.linkedPatientIds || [] } })
-      .select('displayName email userStateId patientIntake privacyConsent')
-      .lean();
+    const isNewModel = guardian.accountType === 'GUARDIAN';
+    let patients;
+    if (isNewModel) {
+      patients = await ClientUserModel.find({ _id: { $in: guardian.linkedClientIds || [] } })
+        .select('name email patientIntake privacyConsent')
+        .lean();
+    } else {
+      patients = await Patient.find({ _id: { $in: guardian.linkedPatientIds || [] } })
+        .select('displayName email userStateId patientIntake privacyConsent')
+        .lean();
+    }
 
     res.json({
       success: true,
       days,
       patient: {
         id: patient._id.toString(),
-        displayName: patient.displayName,
+        displayName: patient.name || patient.displayName,
         email: patient.email,
-        userStateId: patient.userStateId,
+        userStateId: userStateId,
         patientIntakeCompleted: Boolean(patient.patientIntake?.completedAt),
         guardianIntakeCompleted: Boolean(guardianIntake?.completedAt),
         privacyConsent: consent,
       },
       patients: patients.map((p) => ({
         id: p._id.toString(),
-        displayName: p.displayName,
+        displayName: p.name || p.displayName,
         email: p.email,
-        userStateId: p.userStateId,
+        userStateId: p.userStateId || p._id.toString(),
         patientIntakeCompleted: Boolean(p.patientIntake?.completedAt),
         reportSharing: p.privacyConsent?.reportSharing !== false,
       })),
@@ -666,7 +691,7 @@ export const generateSessionReportHandler = async (req, res, next) => {
     if (!userId) throw new AppError('userId is required.', 400);
 
     const user = await UserState.findOrCreate(userId);
-    const patientRecord = await Patient.findOne({ userStateId: userId }).lean() || {};
+    const patientRecord = await ClientUserModel.findById(userId).lean() || await Patient.findOne({ userStateId: userId }).lean() || {};
     
     const activeTask = taskId
       ? (user.taskHistory || []).find((t) => t.id === taskId)
@@ -760,9 +785,14 @@ export const generateSessionReportHandler = async (req, res, next) => {
 
     const downloadUrl = buildPublicReportUrl(req, report._id.toString());
     // Fetch recent mood logs to include in PDF
-    const patientMood = report.patientId
-      ? await Patient.findById(report.patientId).select('dailyMoodLogs').lean()
-      : await Patient.findOne({ userStateId: userId }).select('dailyMoodLogs').lean();
+    let patientMood = report.patientId
+      ? await ClientUserModel.findById(report.patientId).select('dailyMoodLogs').lean()
+      : await ClientUserModel.findById(userId).select('dailyMoodLogs').lean();
+    if (!patientMood) {
+      patientMood = report.patientId
+        ? await Patient.findById(report.patientId).select('dailyMoodLogs').lean()
+        : await Patient.findOne({ userStateId: userId }).select('dailyMoodLogs').lean();
+    }
     const moodLogsForPdf = (patientMood?.dailyMoodLogs || [])
       .sort((a, b) => new Date(b.loggedAt) - new Date(a.loggedAt))
       .slice(0, 14)
@@ -862,9 +892,14 @@ export const downloadSessionReportPdfHandler = async (req, res, next) => {
     if (!report) throw new AppError('Report not found.', 404);
 
     // Fetch recent mood logs to hydrate the PDF
-    const patientMood = report.patientId
-      ? await Patient.findById(report.patientId).select('dailyMoodLogs').lean()
-      : await Patient.findOne({ userStateId: report.userId }).select('dailyMoodLogs').lean();
+    let patientMood = report.patientId
+      ? await ClientUserModel.findById(report.patientId).select('dailyMoodLogs').lean()
+      : await ClientUserModel.findById(report.userId).select('dailyMoodLogs').lean();
+    if (!patientMood) {
+      patientMood = report.patientId
+        ? await Patient.findById(report.patientId).select('dailyMoodLogs').lean()
+        : await Patient.findOne({ userStateId: report.userId }).select('dailyMoodLogs').lean();
+    }
     const moodLogsForPdf = (patientMood?.dailyMoodLogs || [])
       .sort((a, b) => new Date(b.loggedAt) - new Date(a.loggedAt))
       .slice(0, 14)

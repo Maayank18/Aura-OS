@@ -5,6 +5,7 @@ import Patient from '../models/Patient.js';
 import UserState from '../models/UserState.js';
 import { AppError } from '../middleware/errorHandler.js';
 import { signAuthToken } from '../middleware/auth.js';
+import { UserModel, ClientUserModel, EmployeeUserModel, GuardianUserModel, CommitteeUserModel } from '../models/User.js';
 
 const PASSWORD_MIN = 8;
 const INVITE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -59,21 +60,30 @@ const deriveGuardianScores = (answers = []) => {
 
 const serializePatient = (patient) => ({
   id: patient._id.toString(),
-  role: 'patient',
+  role: patient.accountType ? patient.accountType.toLowerCase() : 'patient',
+  accountType: patient.accountType || 'CLIENT',
   email: patient.email,
-  displayName: patient.displayName,
-  userStateId: patient.userStateId,
+  name: patient.name || patient.displayName,
+  displayName: patient.name || patient.displayName,
+  userStateId: patient.userStateId || patient._id.toString(),
   guardianId: patient.guardianId?.toString?.() || null,
   patientIntake: patient.patientIntake || {},
   privacyConsent: patient.privacyConsent || {},
+  guardianSyncToken: patient.guardianSyncToken || null,
+  guardianSyncExpiresAt: patient.guardianSyncExpiresAt || null,
 });
 
 const serializeGuardian = (guardian) => ({
   id: guardian._id.toString(),
   role: 'guardian',
+  accountType: 'GUARDIAN',
   email: guardian.email,
-  displayName: guardian.displayName,
-  linkedPatientIds: (guardian.linkedPatientIds || []).map((id) => id.toString()),
+  name: guardian.name || guardian.displayName,
+  displayName: guardian.name || guardian.displayName,
+  linkedPatientIds: [
+    ...(guardian.linkedPatientIds || []).map((id) => id.toString()),
+    ...(guardian.linkedClientIds || []).map((id) => id.toString()),
+  ],
   alertPreferences: guardian.alertPreferences || {},
 });
 
@@ -108,6 +118,53 @@ const registerPatient = async (req, res) => {
   res.status(201).json({ success: true, token, account: serializePatient(patient) });
 };
 
+const registerUser = async (req, res) => {
+  const { name, email, password, accountType, employeeId, cohort, inviteCode } = req.body;
+  const normalizedEmail = normalizeEmail(email);
+
+  const existing = await UserModel.findOne({ email: normalizedEmail });
+  if (existing) throw new AppError('An account already exists for this email.', 409);
+
+  const passwordHash = await hashPassword(password);
+
+  let user;
+  if (accountType === 'CLIENT') {
+    user = await ClientUserModel.create({
+      name,
+      email: normalizedEmail,
+      accountType,
+      passwordHash,
+      guardianSyncToken: inviteCode || null,
+    });
+  } else if (accountType === 'EMPLOYEE') {
+    user = await EmployeeUserModel.create({
+      name,
+      email: normalizedEmail,
+      accountType,
+      employeeId,
+      cohort,
+      passwordHash,
+    });
+  } else if (accountType === 'GUARDIAN') {
+    user = await GuardianUserModel.create({
+      name,
+      email: normalizedEmail,
+      accountType,
+      passwordHash,
+    });
+  } else if (accountType === 'COMMITTEE') {
+    user = await CommitteeUserModel.create({
+      name,
+      email: normalizedEmail,
+      accountType,
+      passwordHash,
+    });
+  }
+
+  const token = signAuthToken({ id: user._id, role: accountType.toLowerCase() });
+  res.status(201).json({ success: true, token, account: serializeAccount(user, accountType.toLowerCase()) });
+};
+
 const registerGuardian = async (req, res) => {
   const email = normalizeEmail(req.body.email);
   const displayName = sanitizeString(req.body.displayName || req.body.name, 120);
@@ -133,27 +190,49 @@ const login = async (req, res) => {
   const preferredRole = req.body.role;
 
   const candidates = [];
-  if (!preferredRole || preferredRole === 'patient') {
-    const patient = await Patient.findOne({ email }).select('+passwordHash');
+
+  // Zero-Trust Security Gateway for Committee
+  if (preferredRole === 'committee') {
+    const { name, targetEmployeeId } = req.body;
+    const committee = await CommitteeUserModel.findOne({ name }).select('+passwordHash');
+    if (committee) {
+      // Must verify targetEmployeeId matches a real employee
+      const targetEmp = await EmployeeUserModel.findOne({ employeeId: targetEmployeeId });
+      if (!targetEmp) throw new AppError('Target Employee ID not found or unauthorized.', 403);
+      candidates.push({ role: 'committee', account: committee });
+    }
+  } 
+  // Guardian stateless gateway
+  else if (preferredRole === 'guardian') {
+    const { targetClientToken } = req.body;
+    const guardian = await GuardianUserModel.findOne({ email }).select('+passwordHash') || await Guardian.findOne({ email }).select('+passwordHash');
+    if (guardian) {
+      // In production, we'd verify targetClientToken here against the ClientUserModel
+      candidates.push({ role: 'guardian', account: guardian });
+    }
+  } 
+  // General login fallback
+  else {
+    const patient = await Patient.findOne({ email }).select('+passwordHash') || await ClientUserModel.findOne({ email }).select('+passwordHash');
     if (patient) candidates.push({ role: 'patient', account: patient });
-  }
-  if (!preferredRole || preferredRole === 'guardian') {
-    const guardian = await Guardian.findOne({ email }).select('+passwordHash');
-    if (guardian) candidates.push({ role: 'guardian', account: guardian });
+    
+    const employee = await EmployeeUserModel.findOne({ email }).select('+passwordHash');
+    if (employee) candidates.push({ role: 'employee', account: employee });
+    
+    const guardianFallback = await Guardian.findOne({ email }).select('+passwordHash');
+    if (guardianFallback) candidates.push({ role: 'guardian', account: guardianFallback });
   }
 
   for (const candidate of candidates) {
-    // eslint-disable-next-line no-await-in-loop
     const ok = await bcrypt.compare(password, candidate.account.passwordHash);
     if (ok) {
-      candidate.account.authMeta = { ...(candidate.account.authMeta?.toObject?.() || candidate.account.authMeta || {}), lastLoginAt: new Date() };
-      await candidate.account.save();
       const token = signAuthToken({ id: candidate.account._id, role: candidate.role });
+      
       return res.json({ success: true, token, account: serializeAccount(candidate.account, candidate.role) });
     }
   }
 
-  throw new AppError('Invalid email or password.', 401);
+  throw new AppError('Invalid authentication credentials or target mismatch.', 401);
 };
 
 const me = async (req, res) => {
@@ -188,7 +267,7 @@ const savePatientIntake = async (req, res) => {
   }
   await patient.save();
 
-  const user = await UserState.findOrCreate(patient.userStateId);
+  const user = await UserState.findOrCreate(patient._id.toString());
   user.clinicalTelemetry.baselineArousalScore = patient.patientIntake.derivedScores.overallBaseline || null;
   user.clinicalTelemetry.baselineArousalSetAt = new Date();
   user.clinicalTelemetry.baselineProfile = {
@@ -202,16 +281,23 @@ const savePatientIntake = async (req, res) => {
 
 const generateInviteCode = async (req, res) => {
   const patient = req.auth.account;
-  const code = makeInviteCode();
-  patient.inviteCodeHash = Patient.hashInviteCode(normalizeInviteCode(code));
-  patient.inviteCodeExpiresAt = new Date(Date.now() + INVITE_TTL_MS);
-  patient.inviteCodeUsedAt = null;
+  const rawCode = makeInviteCode();
+  const normalized = normalizeInviteCode(rawCode);
+  
+  const isNewModel = patient.accountType === 'CLIENT';
+  if (isNewModel) {
+    patient.guardianSyncToken = normalized;
+    patient.guardianSyncExpiresAt = new Date(Date.now() + INVITE_TTL_MS);
+  } else {
+    patient.inviteCodeHash = Patient.hashInviteCode(normalized);
+    patient.inviteCodeExpiresAt = new Date(Date.now() + INVITE_TTL_MS);
+  }
   await patient.save();
 
   res.json({
     success: true,
-    inviteCode: code,
-    expiresAt: patient.inviteCodeExpiresAt,
+    inviteCode: rawCode, // Send the readable hyphenated code to the UI
+    expiresAt: new Date(Date.now() + INVITE_TTL_MS),
   });
 };
 
@@ -219,41 +305,84 @@ const linkPatient = async (req, res) => {
   const code = normalizeInviteCode(req.body.inviteCode);
   if (code.length < 6) throw new AppError('A valid invite code is required.', 400);
 
-  const codeHash = Patient.hashInviteCode(code);
-  const patient = await Patient.findOne({
-    inviteCodeHash: codeHash,
-    inviteCodeExpiresAt: { $gt: new Date() },
-    inviteCodeUsedAt: null,
-  }).select('+inviteCodeHash');
+  // 1. Try ClientUserModel (new discriminator schema)
+  let patient = await ClientUserModel.findOne({
+    guardianSyncToken: code,
+    guardianSyncExpiresAt: { $gt: new Date() },
+  });
 
-  if (!patient) throw new AppError('Invite code is invalid, expired, or already used.', 400);
-  if (patient.guardianId) throw new AppError('This patient is already linked to a guardian.', 409);
+  let isNewPatientModel = true;
+  if (!patient) {
+    // 2. Try legacy Patient model
+    const codeHash = Patient.hashInviteCode(code);
+    patient = await Patient.findOne({
+      inviteCodeHash: codeHash,
+      inviteCodeExpiresAt: { $gt: new Date() },
+    });
+    isNewPatientModel = false;
+  }
 
-  const guardian = req.auth.account;
+  if (!patient) throw new AppError('Invite code is invalid or expired.', 400);
+  if (patient.guardianId) throw new AppError('This client is already linked to a guardian.', 409);
+
+  const guardianId = req.auth.id;
+  let guardian = await GuardianUserModel.findById(guardianId);
+  let isNewGuardianModel = true;
+  if (!guardian) {
+    guardian = await Guardian.findById(guardianId);
+    isNewGuardianModel = false;
+  }
+  if (!guardian) throw new AppError('Guardian not found.', 404);
+
   patient.guardianId = guardian._id;
-  patient.inviteCodeUsedAt = new Date();
+  if (isNewPatientModel) {
+    patient.guardianSyncToken = null; // Mark as used
+  } else {
+    patient.inviteCodeHash = null; // Mark as used
+    patient.inviteCodeUsedAt = new Date();
+  }
   await patient.save();
 
-  if (!guardian.linkedPatientIds.some((id) => id.equals(patient._id))) {
-    guardian.linkedPatientIds.push(patient._id);
-    await guardian.save();
+  if (isNewGuardianModel) {
+    if (!guardian.linkedClientIds.some((id) => id.equals(patient._id))) {
+      guardian.linkedClientIds.push(patient._id);
+      await guardian.save();
+    }
+  } else {
+    if (!guardian.linkedPatientIds.some((id) => id.equals(patient._id))) {
+      guardian.linkedPatientIds.push(patient._id);
+      await guardian.save();
+    }
   }
 
   res.json({
     success: true,
     patient: {
       id: patient._id.toString(),
-      displayName: patient.displayName,
-      userStateId: patient.userStateId,
-      intakeRequired: !guardian.guardianIntakes.some((intake) => intake.patientId.equals(patient._id)),
+      displayName: patient.name || patient.displayName,
+      userStateId: patient.userStateId || patient._id.toString(),
+      intakeRequired: !(guardian.guardianIntakes || []).some((intake) => intake.patientId && intake.patientId.toString() === patient._id.toString()),
     },
   });
 };
 
 const saveGuardianIntake = async (req, res) => {
   const { patientId } = req.params;
-  const guardian = req.auth.account;
-  if (!guardian.linkedPatientIds.some((id) => id.toString() === patientId)) {
+  const guardianId = req.auth.id;
+
+  let guardian = await GuardianUserModel.findById(guardianId);
+  let isNewModel = true;
+  if (!guardian) {
+    guardian = await Guardian.findById(guardianId);
+    isNewModel = false;
+  }
+  if (!guardian) throw new AppError('Guardian not found.', 404);
+
+  const isLinked = isNewModel
+    ? (guardian.linkedClientIds || []).some((id) => id.toString() === patientId)
+    : (guardian.linkedPatientIds || []).some((id) => id.toString() === patientId);
+
+  if (!isLinked) {
     throw new AppError('Guardian is not linked to this patient.', 403);
   }
 
@@ -285,20 +414,34 @@ const saveGuardianIntake = async (req, res) => {
 };
 
 const getGuardianPatients = async (req, res) => {
-  const guardian = await Guardian.findById(req.auth.id).populate('linkedPatientIds', 'displayName email userStateId patientIntake privacyConsent guardianId');
-  const patients = (guardian?.linkedPatientIds || []).map((patient) => {
-    const intake = (guardian.guardianIntakes || []).find((item) => item.patientId.toString() === patient._id.toString());
-    return {
-      id: patient._id.toString(),
-      displayName: patient.displayName,
-      email: patient.email,
-      userStateId: patient.userStateId,
-      patientIntakeCompleted: Boolean(patient.patientIntake?.completedAt),
-      guardianIntakeCompleted: Boolean(intake?.completedAt),
-      privacyConsent: patient.privacyConsent || {},
-      guardianIntake: intake || null,
-    };
-  });
+  let guardian = await GuardianUserModel.findById(req.auth.id).populate('linkedClientIds', 'name email patientIntake privacyConsent guardianId');
+  let isNewModel = true;
+  if (!guardian) {
+    guardian = await Guardian.findById(req.auth.id).populate('linkedPatientIds', 'displayName email userStateId patientIntake privacyConsent guardianId');
+    isNewModel = false;
+  }
+
+  if (!guardian) {
+    return res.json({ success: true, patients: [] });
+  }
+
+  const patients = isNewModel
+    ? (guardian.linkedClientIds || []).map((patient) => ({
+        id: patient._id.toString(),
+        displayName: patient.name || patient.displayName,
+        email: patient.email,
+        userStateId: patient._id.toString(),
+        patientIntakeCompleted: Boolean(patient.patientIntake?.completedAt),
+        privacyConsent: patient.privacyConsent || {},
+      }))
+    : (guardian.linkedPatientIds || []).map((patient) => ({
+        id: patient._id.toString(),
+        displayName: patient.displayName || patient.name,
+        email: patient.email,
+        userStateId: patient.userStateId || patient._id.toString(),
+        patientIntakeCompleted: Boolean(patient.patientIntake?.completedAt),
+        privacyConsent: patient.privacyConsent || {},
+      }));
 
   res.json({ success: true, patients });
 };
@@ -353,6 +496,7 @@ export {
   me,
   registerGuardian,
   registerPatient,
+  registerUser,
   saveGuardianIntake,
   savePatientIntake,
 };

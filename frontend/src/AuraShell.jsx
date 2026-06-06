@@ -11,10 +11,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, Wind, Zap, LogOut, Smile } from 'lucide-react';
+import { Mic, Wind, Zap, LogOut, Smile, ChevronDown, Copy, Check, Shield } from 'lucide-react';
 import useStore from './store/useStore.js';
 import { shatterApi, stateApi } from './services/api.js';
-import { getStoredAccount, clearAuthSession } from './services/authApi.js';
+import { getStoredAccount, clearAuthSession, authApi } from './services/authApi.js';
 import ErrorBoundary        from './components/ErrorBoundary.jsx';
 import AuraVoice            from './components/aura-voice/AuraVoice.jsx';
 import CognitiveForge       from './components/cognitive-forge/CognitiveForge.jsx';
@@ -74,6 +74,50 @@ export default function AuraShell() {
   const [initError,    setInitError]    = useState(false);
   const [resumeBanner, setResumeBanner] = useState(null);
   const [moodOpen,     setMoodOpen]     = useState(false);
+
+  const auth = useStore((s) => s.auth);
+  const account = auth?.account || getStoredAccount();
+
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const [inviteCode, setInviteCode] = useState(null);
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  // Sync initial sync code if present and valid
+  useEffect(() => {
+    if (account?.guardianSyncToken && new Date(account.guardianSyncExpiresAt) > new Date()) {
+      setInviteCode(account.guardianSyncToken);
+    } else {
+      setInviteCode(null);
+    }
+  }, [account]);
+
+  // Sync fresh account data on mount
+  useEffect(() => {
+    authApi.me().catch(() => {});
+  }, []);
+
+  const handleGenerateCode = async () => {
+    setInviteLoading(true);
+    try {
+      const res = await authApi.generateInviteCode();
+      setInviteCode(res.inviteCode);
+      // Fetch fresh /me to update local storage and Zustand account details
+      await authApi.me().catch(() => {});
+    } catch (err) {
+      console.error('[Guardian Code] Generation failed:', err);
+      alert('Failed to generate sync code. Please try again.');
+    } finally {
+      setInviteLoading(false);
+    }
+  };
+
+  const handleCopyCode = () => {
+    if (!inviteCode) return;
+    navigator.clipboard?.writeText(inviteCode);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+  };
   const [theme, setTheme] = useState(() => {
     const storedTheme = localStorage.getItem('aura-theme');
     return storedTheme && THEME_IDS.has(storedTheme) ? storedTheme : DEFAULT_THEME;
@@ -100,8 +144,8 @@ export default function AuraShell() {
   useEffect(() => {
     if (!isInitialized) return;
     const account = getStoredAccount();
-    // Only redirect to intake if user logged in as patient with no local profile
-    if (!userProfile && account?.role === 'patient') {
+    // Only redirect to intake if user logged in as patient or client with no local profile
+    if (!userProfile && (account?.role === 'patient' || account?.role === 'client')) {
       // Check if intake already done in account
       if (!account?.patientIntake?.completedAt) {
         navigate('/patient/onboarding');
@@ -240,25 +284,192 @@ export default function AuraShell() {
 
           {/* Right controls */}
           <div className="topnav-actions flex items-center gap-3" style={{ position: 'relative' }}>
-            {/* Profile badge — click to retake intake */}
-            {userProfile && (
-              <ProfileBadge profile={userProfile} onReset={handleRetakeIntake} />
-            )}
-            {/* Daily Mood Check-In toggle */}
-            <button onClick={() => setMoodOpen((o) => !o)}
-              title="Daily Mood Check-In"
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 999, fontSize: 11, fontWeight: 700, color: moodOpen ? '#00e5ff' : 'var(--text-3)', background: moodOpen ? 'rgba(0,229,255,0.1)' : 'rgba(255,255,255,0.04)', border: `1px solid ${moodOpen ? 'rgba(0,229,255,0.25)' : 'rgba(255,255,255,0.07)'}`, letterSpacing: '0.04em', textTransform: 'uppercase', cursor: 'pointer', transition: 'all 0.2s' }}
-            >
-              😊 Mood
-            </button>
+            {/* Unified Profile Button & Dropdown */}
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => setProfileDropdownOpen((o) => !o)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '6px 14px', borderRadius: 999,
+                  background: 'rgba(255, 255, 255, 0.04)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  cursor: 'pointer', color: 'var(--text-1)',
+                  fontFamily: 'inherit', fontSize: 13, fontWeight: 700,
+                  transition: 'all 0.2s',
+                }}
+                className="hover:bg-white/10"
+              >
+                <Smile size={16} />
+                <span>{account?.displayName || account?.name || 'Profile'}</span>
+                <ChevronDown size={14} style={{ opacity: 0.6, transform: profileDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+              </button>
+
+              {profileDropdownOpen && (
+                <>
+                  <div 
+                    onClick={() => setProfileDropdownOpen(false)} 
+                    style={{ position: 'fixed', inset: 0, zIndex: 100, cursor: 'default' }} 
+                  />
+                  <div 
+                    className="tg-surface"
+                    style={{
+                      position: 'absolute', top: 'calc(100% + 10px)', right: 0,
+                      width: 320, borderRadius: 20, padding: '20px', zIndex: 150,
+                      display: 'flex', flexDirection: 'column', gap: 16,
+                      textAlign: 'left'
+                    }}
+                  >
+                    {/* User info */}
+                    <div>
+                      <p style={{ fontSize: 15, fontWeight: 900, color: 'var(--text-1)' }}>
+                        {account?.displayName || account?.name}
+                      </p>
+                      <p style={{ fontSize: 12, color: 'var(--text-3)', wordBreak: 'break-all' }}>
+                        {account?.email}
+                      </p>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 10 }}>
+                        <span style={{
+                          fontSize: 10, fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase',
+                          color: 'rgba(0,229,255,1)', background: 'rgba(0,229,255,0.08)',
+                          padding: '2px 8px', borderRadius: 999, border: '1px solid rgba(0,229,255,0.2)'
+                        }}>
+                          {account?.role || 'Client'}
+                        </span>
+                        {userProfile && (
+                          <span style={{
+                            fontSize: 10, fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase',
+                            color: 'rgba(196,181,253,1)', background: 'rgba(196,181,253,0.08)',
+                            padding: '2px 8px', borderRadius: 999, border: '1px solid rgba(196,181,253,0.2)'
+                          }}>
+                            {userProfile.severity} Baseline
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <hr style={{ border: 'none', borderTop: '1px solid rgba(255,255,255,0.06)' }} />
+
+                    {/* Actions */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {/* Log Daily Mood */}
+                      <button
+                        onClick={() => { setMoodOpen(true); setProfileDropdownOpen(false); }}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                          padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.02)',
+                          border: '1px solid rgba(255,255,255,0.05)', color: 'var(--text-2)',
+                          fontSize: 13, fontWeight: 600, cursor: 'pointer', textAlign: 'left',
+                          transition: 'all 0.2s'
+                        }}
+                        className="hover:bg-white/5"
+                      >
+                        <span style={{ fontSize: 16 }}>😊</span> Log Daily Mood
+                      </button>
+
+                      {/* Retake Intake */}
+                      <button
+                        onClick={() => { handleRetakeIntake(); setProfileDropdownOpen(false); }}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                          padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.02)',
+                          border: '1px solid rgba(255,255,255,0.05)', color: 'var(--text-2)',
+                          fontSize: 13, fontWeight: 600, cursor: 'pointer', textAlign: 'left',
+                          transition: 'all 0.2s'
+                        }}
+                        className="hover:bg-white/5"
+                      >
+                        <span style={{ fontSize: 16 }}>🔄</span> Retake Clinical Intake
+                      </button>
+                    </div>
+
+                    <hr style={{ border: 'none', borderTop: '1px solid rgba(255,255,255,0.06)' }} />
+
+                    {/* Guardian sync */}
+                    <div>
+                      <h3 style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-3)', marginBottom: 8 }}>
+                        🛡️ Guardian Sync
+                      </h3>
+                      
+                      {account?.guardianId ? (
+                        <div style={{
+                          display: 'flex', alignItems: 'center', gap: 8,
+                          padding: '10px 12px', borderRadius: 12,
+                          background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.15)',
+                          color: '#86efac', fontSize: 12.5, fontWeight: 600
+                        }}>
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e' }} />
+                          Guardian Sync Active
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          {inviteCode ? (
+                            <div style={{
+                              padding: '12px', borderRadius: 12,
+                              background: 'rgba(0,229,255,0.04)', border: '1px solid rgba(0,229,255,0.15)',
+                              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6
+                            }}>
+                              <p style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Invite Sync Code</p>
+                              <p style={{ fontFamily: 'monospace', fontSize: 22, fontWeight: 900, color: '#00e5ff', letterSpacing: '0.06em' }}>
+                                {inviteCode}
+                              </p>
+                              <button
+                                onClick={handleCopyCode}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center', width: '100%',
+                                  padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.04)',
+                                  border: '1px solid rgba(255,255,255,0.07)', color: 'var(--text-2)',
+                                  fontSize: 11, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s'
+                                }}
+                                className="hover:bg-white/10"
+                              >
+                                {copied ? 'Copied!' : 'Copy Code'}
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={handleGenerateCode}
+                              disabled={inviteLoading}
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center', width: '100%',
+                                padding: '10px 12px', borderRadius: 12, background: 'rgba(0,229,255,0.1)',
+                                border: '1px solid rgba(0,229,255,0.2)', color: '#00e5ff',
+                                fontSize: 12.5, fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s'
+                              }}
+                              className="hover:bg-cyan-glow/20"
+                            >
+                              {inviteLoading ? 'Generating...' : 'Generate Sync Code'}
+                            </button>
+                          )}
+                          <p style={{ fontSize: 10.5, color: 'var(--text-3)', lineHeight: 1.4 }}>
+                            Share this 24-hour sync code with your guardian to link profiles.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    <hr style={{ border: 'none', borderTop: '1px solid rgba(255,255,255,0.06)' }} />
+
+                    {/* Logout */}
+                    <button
+                      onClick={() => { handleLogout(); setProfileDropdownOpen(false); }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center', width: '100%',
+                        padding: '12px', borderRadius: 12, background: 'rgba(255,107,138,0.08)',
+                        border: '1px solid rgba(255,107,138,0.18)', color: '#ff6b8a',
+                        fontSize: 13, fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s'
+                      }}
+                      className="hover:bg-red-glow/20"
+                    >
+                      <LogOut size={14} /> Logout
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+
             <AnimatePresence>
               {moodOpen && <MoodCheckIn onClose={() => setMoodOpen(false)} />}
             </AnimatePresence>
-            <button onClick={handleLogout}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 999, fontSize: 11, fontWeight: 700, color: '#ff6b8a', background: 'rgba(255,107,138,0.1)', border: '1px solid rgba(255,107,138,0.2)', letterSpacing: '0.04em', textTransform: 'uppercase', cursor: 'pointer' }}
-            >
-              <LogOut size={12} /> Logout
-            </button>
             <ThemeSelector currentTheme={theme} onChange={handleThemeChange} />
           </div>
         </nav>

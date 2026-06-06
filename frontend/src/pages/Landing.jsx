@@ -4,8 +4,10 @@ import { useNavigate } from 'react-router-dom';
 import {
   ArrowRight, Mic, Wind, Zap, Shield, Brain, Activity,
   AlertTriangle, ChevronDown, TrendingDown, CheckCircle, Heart,
-  Eye, Cpu, Radio, Layers, BarChart2,
+  Eye, Cpu, Radio, Layers, BarChart2, Building2, UserCircle2, Users, X
 } from 'lucide-react';
+import useStore from '../store/useStore.js';
+import { useAuth } from '../hooks/useAuth.js';
 
 /* ══════════════════════════════════════════════════════════
    SCROLL-AWARE SECTION WRAPPER
@@ -662,7 +664,17 @@ function SolutionCompare() {
 ══════════════════════════════════════════════════════════ */
 export default function Landing() {
   const navigate = useNavigate();
-  const [navRole, setNavRole] = useState('patient'); // 'patient' or 'guardian'
+  const { isAuthenticated, role } = useAuth();
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate(role === 'guardian' || role === 'committee' ? '/guardian/dashboard' : '/app', { replace: true });
+    }
+  }, [isAuthenticated, role, navigate]);
+
+  const { authForm, setAuthFormMode, setAuthFormSubRole } = useStore();
+  const { currentMode } = authForm;
+
   const { scrollY } = useScroll();
   const heroOpacity = useTransform(scrollY, [0, 500], [1, 0]);
   const heroY       = useTransform(scrollY, [0, 500], [0, -100]);
@@ -690,54 +702,54 @@ export default function Landing() {
           ))}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          {/* Role Toggle */}
-          <div style={{
-            display: 'flex',
-            background: 'rgba(0,0,0,0.4)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: 999,
-            padding: 4,
-            position: 'relative'
-          }}>
-            <div style={{
-              position: 'absolute',
-              top: 4,
-              bottom: 4,
-              width: 'calc(50% - 4px)',
-              left: navRole === 'patient' ? 4 : '50%',
-              background: navRole === 'patient' ? 'rgba(0,229,255,0.15)' : 'rgba(255,179,0,0.15)',
-              border: `1px solid ${navRole === 'patient' ? 'rgba(0,229,255,0.3)' : 'rgba(255,179,0,0.3)'}`,
-              borderRadius: 999,
-              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-            }} />
-            
-            <button 
-              onClick={() => setNavRole('patient')}
-              style={{
-                position: 'relative', zIndex: 1, padding: '6px 14px', fontSize: 12, fontWeight: 700,
-                color: navRole === 'patient' ? '#00e5ff' : 'var(--text-3)',
-                transition: 'color 0.3s', display: 'flex', alignItems: 'center', gap: 6,
-                background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit'
-              }}
-            >
-              <Heart size={14} /> Patient
-            </button>
-            <button 
-              onClick={() => setNavRole('guardian')}
-              style={{
-                position: 'relative', zIndex: 1, padding: '6px 14px', fontSize: 12, fontWeight: 700,
-                color: navRole === 'guardian' ? '#ffb300' : 'var(--text-3)',
-                transition: 'color 0.3s', display: 'flex', alignItems: 'center', gap: 6,
-                background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit'
-              }}
-            >
-              <Shield size={14} /> Guardian
-            </button>
+          
+          {/* Top-Level Segmented Control */}
+          <div style={{ display: 'flex', background: 'rgba(5, 10, 20, 0.6)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 999, padding: 4, position: 'relative', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.5)' }}>
+             <button 
+                onClick={() => { setAuthFormMode('CLIENT'); setAuthFormSubRole('USER'); }} 
+                style={{ position: 'relative', zIndex: 1, padding: '6px 18px', fontSize: 13, fontWeight: 700, color: currentMode === 'CLIENT' ? '#fff' : '#00e5ff', transition: 'color 0.3s', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+             >
+                {currentMode === 'CLIENT' && (
+                  <motion.div
+                    layoutId="landingModeToggle"
+                    className="absolute inset-0 rounded-full"
+                    style={{ background: 'rgba(0,229,255,0.12)', border: '1px solid rgba(0,229,255,0.3)', zIndex: -1 }}
+                    transition={{ type: 'spring', bounce: 0.2, duration: 0.5 }}
+                  />
+                )}
+                Client
+             </button>
+             <button 
+                onClick={() => { setAuthFormMode('EMPLOYEE'); setAuthFormSubRole('USER'); }} 
+                style={{ position: 'relative', zIndex: 1, padding: '6px 18px', fontSize: 13, fontWeight: 700, color: currentMode === 'EMPLOYEE' ? '#fff' : (currentMode === 'CLIENT' ? '#7c3aed' : '#fff'), transition: 'color 0.3s', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+             >
+                {currentMode === 'EMPLOYEE' && (
+                  <motion.div
+                    layoutId="landingModeToggle"
+                    className="absolute inset-0 rounded-full"
+                    style={{ background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(124,58,237,0.3)', zIndex: -1 }}
+                    transition={{ type: 'spring', bounce: 0.2, duration: 0.5 }}
+                  />
+                )}
+                Employee
+             </button>
           </div>
 
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button onClick={() => navigate(navRole === 'patient' ? '/login' : '/guardian/login')} className="tg-btn-secondary" style={{ width: 'auto', padding: '8px 18px', fontSize: 13 }}>Sign in</button>
-            <button onClick={() => navigate(`/signup?role=${navRole}`)} className="tg-btn-primary" style={{ width: 'auto', padding: '8px 20px', fontSize: 13 }}>Get started</button>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <button 
+              onClick={() => navigate('/login')} 
+              className="tg-btn-secondary" 
+              style={{ width: 'auto', padding: '8px 24px', fontSize: 13, border: '1px solid rgba(255,255,255,0.08)' }}
+            >
+              Log in
+            </button>
+            <button 
+              onClick={() => navigate('/signup')} 
+              className="tg-btn-primary" 
+              style={{ width: 'auto', padding: '8px 24px', fontSize: 13, background: currentMode === 'EMPLOYEE' ? '#7c3aed' : '#00e5ff', color: currentMode === 'EMPLOYEE' ? '#fff' : '#000' }}
+            >
+              Get started
+            </button>
           </div>
         </div>
       </nav>

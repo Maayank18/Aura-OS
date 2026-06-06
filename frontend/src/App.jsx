@@ -26,20 +26,20 @@ export default function App() {
       <Route path="/login" element={<AuthPage />} />
       <Route path="/signup" element={<AuthPage />} />
 
-      {/* ── Patient protected ── */}
+      {/* ── Client & Employee protected ── */}
       <Route path="/app" element={
-        <RequireAuth role="patient">
+        <RequireAuth roles={['client', 'employee']}>
           <AuraShell />
         </RequireAuth>
       } />
       <Route path="/patient/onboarding" element={
-        <RequireAuth role="patient">
+        <RequireAuth roles={['client', 'employee']}>
           <PatientIntake />
         </RequireAuth>
       } />
       {/* legacy route from old PatientOnboarding */}
       <Route path="/patient/onboarding/legacy" element={
-        <RequireAuth role="patient">
+        <RequireAuth roles={['client', 'employee']}>
           <PatientOnboarding />
         </RequireAuth>
       } />
@@ -48,7 +48,7 @@ export default function App() {
       <Route path="/guardian/login" element={<GuardianLogin />} />
 
       <Route path="/guardian" element={
-        <RequireAuth role="guardian">
+        <RequireAuth roles={['guardian', 'committee']}>
           <GuardianLayout />
         </RequireAuth>
       }>

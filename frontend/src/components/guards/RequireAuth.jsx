@@ -4,7 +4,7 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth.js';
 
-export default function RequireAuth({ role, children }) {
+export default function RequireAuth({ role, roles, children }) {
   const { isAuthenticated, role: userRole } = useAuth();
   const location = useLocation();
 
@@ -12,8 +12,17 @@ export default function RequireAuth({ role, children }) {
     return <Navigate to="/" state={{ from: location }} replace />;
   }
 
-  if (role && userRole !== role) {
-    return <Navigate to={userRole === 'guardian' ? '/guardian/dashboard' : '/app'} replace />;
+  // Normalize legacy 'patient' role to 'client'
+  const normalizedRole = userRole === 'patient' ? 'client' : userRole;
+  const allowedRoles = roles || (role ? [role] : []);
+
+  if (allowedRoles.length > 0 && !allowedRoles.includes(normalizedRole)) {
+    if (normalizedRole === 'guardian' || normalizedRole === 'committee') {
+      return <Navigate to="/guardian/dashboard" replace />;
+    } else {
+      if (location.pathname === '/app') return <Navigate to="/" replace />;
+      return <Navigate to="/app" replace />;
+    }
   }
 
   return children;

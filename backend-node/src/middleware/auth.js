@@ -1,6 +1,5 @@
 import jwt from 'jsonwebtoken';
-import Guardian from '../models/Guardian.js';
-import Patient from '../models/Patient.js';
+import { UserModel } from '../models/User.js';
 import { AppError } from './errorHandler.js';
 
 const getJwtSecret = () => process.env.JWT_SECRET || 'auraos-dev-secret-change-before-production';
@@ -15,10 +14,14 @@ export const requireAuth = async (req, _res, next) => {
 
   try {
     const payload = jwt.verify(token, getJwtSecret());
-    const Model = payload.role === 'guardian' ? Guardian : payload.role === 'patient' ? Patient : null;
-    if (!Model) throw new AppError('Invalid auth role.', 401);
+    
+    // Ensure the role is one of the valid ones
+    const validRoles = ['client', 'employee', 'guardian', 'committee', 'patient'];
+    if (!validRoles.includes(payload.role)) {
+      throw new AppError('Invalid auth role.', 401);
+    }
 
-    const account = await Model.findById(payload.sub);
+    const account = await UserModel.findById(payload.sub);
     if (!account) throw new AppError('Account not found.', 401);
 
     req.auth = {

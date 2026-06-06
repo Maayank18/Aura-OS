@@ -48,6 +48,26 @@ const useStore = create((set, get) => ({
   // Loaded synchronously from localStorage on store creation.
   userProfile: loadPersistedProfile(),
 
+  auth: {
+    status: 'idle', // idle | checking | unauthenticated | authenticated
+    account: null,  // { id, role, email, displayName, ... }
+    token: null,
+  },
+  setAuth: (payload) => set((s) => ({ auth: { ...s.auth, ...payload } })),
+  
+  // -- Auth Form State for Client/Employee Bifurcation --
+  authForm: {
+    currentMode: 'CLIENT',
+    subRole: 'USER',
+    employeeDetails: {
+      employeeId: '',
+      cohort: null,
+    },
+  },
+  setAuthFormMode: (mode) => set((s) => ({ authForm: { ...s.authForm, currentMode: mode } })),
+  setAuthFormSubRole: (role) => set((s) => ({ authForm: { ...s.authForm, subRole: role } })),
+  setAuthFormEmployeeDetails: (details) => set((s) => ({ authForm: { ...s.authForm, employeeDetails: { ...s.authForm.employeeDetails, ...details } } })),
+
   setUserProfile: (profile) => {
     try {
       localStorage.setItem('aura-profile', JSON.stringify(profile));

@@ -100,11 +100,11 @@ export default function PatientIntake() {
     if (!isInitialized) initSession().catch(() => {});
   }, [initSession, isInitialized]);
 
-  // Guard: only patients
+  // Guard: only patients/clients
   useEffect(() => {
     const acct = getStoredAccount();
     if (!acct) { navigate('/login', { replace: true }); return; }
-    if (acct.role !== 'patient') { navigate('/guardian/dashboard', { replace: true }); }
+    if (acct.role !== 'patient' && acct.role !== 'client') { navigate('/guardian/dashboard', { replace: true }); }
   }, []); // eslint-disable-line
 
   const q    = QUESTIONS[index];
@@ -173,72 +173,80 @@ export default function PatientIntake() {
 
   return (
     <div style={{
-      height: '100dvh', overflow: 'hidden', background: 'var(--bg-root)',
+      minHeight: '100dvh', overflowY: 'auto', background: 'var(--bg-root)',
       backgroundImage: `radial-gradient(ellipse 70% 50% at 50% 0%, rgba(0,60,110,0.8), transparent 60%)`,
-      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      padding: '16px',
+      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      padding: '40px 16px',
     }}>
-      {/* ── Progress bar ── */}
-      {phase === 'intake' && (
-        <div style={{ width: '100%', maxWidth: 580, marginBottom: 32 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10, alignItems: 'center' }}>
-            <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-3)' }}>Clinical Intake</span>
-            <span style={{ fontSize: 12, fontWeight: 700, color, transition: 'color 0.4s' }}>{pct}% complete</span>
-          </div>
-          <div className="progress-track">
-            <motion.div animate={{ width: `${pct}%` }} transition={{ duration: 0.5 }} className="progress-fill" />
-          </div>
-          {/* Dot indicators */}
-          <div style={{ display: 'flex', gap: 6, marginTop: 12, justifyContent: 'center' }}>
-            {QUESTIONS.map((_, i) => (
-              <div
-                key={i}
-                className={`tg-dot ${i === index ? 'tg-dot-active' : ''}`}
-                style={answers[QUESTIONS[i].id] != null && i !== index ? { background: color, opacity: 0.5 } : {}}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      <motion.div
-        className="tg-surface"
-        style={{ width: '100%', maxWidth: 580, borderRadius: 24, overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}
-        initial={{ opacity: 0, y: 32 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-      >
-        {/* ── INTAKE PHASE ── */}
+      <div style={{
+        width: '100%',
+        maxWidth: 580,
+        margin: 'auto 0',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+      }}>
+        {/* ── Progress bar ── */}
         {phase === 'intake' && (
-          <div style={{ padding: '24px 28px', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            {/* Category label */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
-              <span style={{
-                fontSize: 11, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase',
-                color, padding: '4px 12px', borderRadius: 999,
-                background: `${color}14`, border: `1px solid ${color}25`,
-                transition: 'all 0.35s',
-              }}>
-                {q.category}
-              </span>
-              <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 600 }}>
-                {index + 1} / {QUESTIONS.length}
-              </span>
+          <div style={{ width: '100%', marginBottom: 32 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10, alignItems: 'center' }}>
+              <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-3)' }}>Clinical Intake</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color, transition: 'color 0.4s' }}>{pct}% complete</span>
             </div>
+            <div className="progress-track">
+              <motion.div animate={{ width: `${pct}%` }} transition={{ duration: 0.5 }} className="progress-fill" />
+            </div>
+            {/* Dot indicators */}
+            <div style={{ display: 'flex', gap: 6, marginTop: 12, justifyContent: 'center' }}>
+              {QUESTIONS.map((_, i) => (
+                <div
+                  key={i}
+                  className={`tg-dot ${i === index ? 'tg-dot-active' : ''}`}
+                  style={answers[QUESTIONS[i].id] != null && i !== index ? { background: color, opacity: 0.5 } : {}}
+                />
+              ))}
+            </div>
+          </div>
+        )}
 
-            {/* Question slide */}
-            <div style={{ position: 'relative', overflow: 'hidden', flex: 1, minHeight: 480 }}>
-              <AnimatePresence mode="wait" custom={direction}>
-                <motion.div
-                  key={q.id}
-                  custom={direction}
-                  variants={slideVariants}
-                  initial="enter"
-                  animate="center"
-                  exit="exit"
-                  transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-                  style={{ position: 'absolute', width: '100%' }}
-                >
+        <motion.div
+          className="tg-surface"
+          style={{ width: '100%', borderRadius: 24, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+          initial={{ opacity: 0, y: 32 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+        >
+          {/* ── INTAKE PHASE ── */}
+          {phase === 'intake' && (
+            <div style={{ padding: '24px 28px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+              {/* Category label */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
+                <span style={{
+                  fontSize: 11, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase',
+                  color, padding: '4px 12px', borderRadius: 999,
+                  background: `${color}14`, border: `1px solid ${color}25`,
+                  transition: 'all 0.35s',
+                }}>
+                  {q.category}
+                </span>
+                <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 600 }}>
+                  {index + 1} / {QUESTIONS.length}
+                </span>
+              </div>
+
+              {/* Question slide */}
+              <div style={{ position: 'relative', overflow: 'hidden', minHeight: 440 }}>
+                <AnimatePresence mode="wait" custom={direction}>
+                  <motion.div
+                    key={q.id}
+                    custom={direction}
+                    variants={slideVariants}
+                    initial="enter"
+                    animate="center"
+                    exit="exit"
+                    transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                    style={{ position: 'relative', width: '100%' }}
+                  >
                   {/* Emoji + question */}
                   <div style={{ marginBottom: 24 }}>
                     <div style={{ fontSize: 40, marginBottom: 16, lineHeight: 1 }}>{q.emoji}</div>
@@ -380,7 +388,7 @@ export default function PatientIntake() {
                 <button onClick={handleGenerateInvite} disabled={busy} className="tg-btn-primary">
                   {busy ? <><span className="spinner" /> Generating...</> : <>Generate guardian code <ShieldCheck size={16} /></>}
                 </button>
-                <button onClick={() => navigate('/app')} className="tg-btn-secondary">
+                <button onClick={() => navigate('/app', { replace: true })} className="tg-btn-secondary">
                   Enter AuraOS later
                 </button>
               </div>
@@ -401,7 +409,7 @@ export default function PatientIntake() {
                 <button onClick={handleCopy} className="tg-btn-secondary" style={{ width: '100%' }}>
                   {copied ? <><CheckCircle size={15} color="#22c55e" /> Copied!</> : <><Copy size={15} /> Copy code</>}
                 </button>
-                <button onClick={() => navigate('/app')} className="tg-btn-primary">
+                <button onClick={() => navigate('/app', { replace: true })} className="tg-btn-primary">
                   Enter AuraOS <ArrowRight size={16} />
                 </button>
               </div>
@@ -409,7 +417,9 @@ export default function PatientIntake() {
             {error && <p style={{ marginTop: 12, fontSize: 13, color: '#fca5a5' }}>{error}</p>}
           </motion.div>
         )}
+
       </motion.div>
     </div>
-  );
+  </div>
+);
 }

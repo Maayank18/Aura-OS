@@ -331,11 +331,12 @@ function ReportOverlay({ onClose, reportInfo, error }) {
   const [isDownloading, setIsDownloading] = useState(false);
 
   const handleDownload = async () => {
-    if (!reportInfo?._id || isDownloading) return;
+    const reportId = reportInfo?.reportId || reportInfo?._id;
+    if (!reportId || isDownloading) return;
     setIsDownloading(true);
     try {
-      const filename = `AuraOS-Report-${reportInfo._id.slice(-6)}.pdf`;
-      await clinicalApi.downloadReportPdfBuffer(reportInfo._id, filename);
+      const filename = `AuraOS-Report-${reportId.slice(-6)}.pdf`;
+      await clinicalApi.downloadReportPdfBuffer(reportId, filename);
     } catch (e) {
       console.error('[Download] Failed:', e);
       alert('Download failed. Please try again.');

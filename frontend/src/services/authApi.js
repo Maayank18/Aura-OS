@@ -1,10 +1,18 @@
+import useStore from '../store/useStore.js';
+
 const BASE = '/api/auth';
 const TOKEN_KEY = 'aura-auth-token';
 const ACCOUNT_KEY = 'aura-auth-account';
 const API_TIMEOUT = 12_000;
 
-export const getAuthToken = () => localStorage.getItem(TOKEN_KEY) || '';
+export const getAuthToken = () => {
+  const stateToken = useStore.getState().auth?.token;
+  return stateToken || localStorage.getItem(TOKEN_KEY) || '';
+};
+
 export const getStoredAccount = () => {
+  const stateAccount = useStore.getState().auth?.account;
+  if (stateAccount) return stateAccount;
   try {
     return JSON.parse(localStorage.getItem(ACCOUNT_KEY) || 'null');
   } catch {
@@ -13,11 +21,18 @@ export const getStoredAccount = () => {
 };
 
 export const setAuthSession = ({ token, account }) => {
-  if (token) localStorage.setItem(TOKEN_KEY, token);
-  if (account) localStorage.setItem(ACCOUNT_KEY, JSON.stringify(account));
+  const isStateless = account?.role === 'guardian' || account?.role === 'committee' || account?.accountType === 'GUARDIAN' || account?.accountType === 'COMMITTEE';
+  
+  useStore.getState().setAuth({ token, account });
+
+  if (!isStateless) {
+    if (token) localStorage.setItem(TOKEN_KEY, token);
+    if (account) localStorage.setItem(ACCOUNT_KEY, JSON.stringify(account));
+  }
 };
 
 export const clearAuthSession = () => {
+  useStore.getState().setAuth({ token: null, account: null });
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(ACCOUNT_KEY);
 };
@@ -67,6 +82,7 @@ const req = async (method, path, body, timeoutMs = API_TIMEOUT) => {
 };
 
 export const authApi = {
+  register: (body) => req('POST', '/register', body),
   patientRegister: (body) => req('POST', '/patient/register', body),
   guardianRegister: (body) => req('POST', '/guardian/register', body),
   login: (body) => req('POST', '/login', body),
