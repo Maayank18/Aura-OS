@@ -39,7 +39,7 @@ export const spawnWordBlock = (world, word, uuid, weight, canvasW, spawnX) => {
     frictionAir: 0.03,
     density: 0.004,          // heavier blocks
     render: {
-      fillStyle: '#1a1a2e',  // brutalist dark fill
+      fillStyle: 'var(--theme-dark-fill)',  // brutalist dark fill
       strokeStyle: color,
       lineWidth: 2.5,        // thick aggressive border
     },

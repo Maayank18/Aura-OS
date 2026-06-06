@@ -22,6 +22,9 @@ import useStore from '../../store/useStore.js';
 import { forgeApi } from '../../services/api.js';
 import PerceptionProbe from '../PerceptionProbe.jsx';
 import usePhysics from '../../hooks/usePhysics.js';
+import CalmButton from '../CalmButton/CalmButton.jsx';
+import MetronomeTapping from './MetronomeTapping.jsx';
+import SparkCanvas from './SparkCanvas.jsx';
 
 const { Engine, Render, Runner, World, Bodies, Body, Composite, Events, Mouse, MouseConstraint } = Matter;
 
@@ -68,6 +71,18 @@ const derivePredictedEffects = (gameId, metrics) => {
           : 'Moderate tension management; some arousal regulation difficulty observed.');
       break;
     }
+    case 'spark_canvas': {
+      const attentionScore = extraData.attentionScore ?? accuracy ?? 0;
+      const coverage = extraData.canvas_coverage || 0;
+      const energy = extraData.stroke_energy || 'moderate';
+      eff.stressReduction    = Math.min(10, 4 + Math.round(coverage / 20));
+      eff.dopamineActivation = extraData.usedFallback ? 6 : 8;
+      eff.focusScore         = Math.min(10, Math.round(attentionScore / 10));
+      eff.arousalLevel       = energy === 'high' ? 'high' : energy === 'low' ? 'low' : 'moderate';
+      eff.clinicalNote       = extraData.clinicalNote ||
+        `Spark Canvas: ${interactions} strokes, ${coverage}% coverage, ${energy} stroke energy.`;
+      break;
+    }
     case 'color_sort': {
       const mistakes = extraData.mistakes || 0;
       eff.stressReduction    = 4;
@@ -112,6 +127,18 @@ const derivePredictedEffects = (gameId, metrics) => {
           : 'Slow scanning — significant attention deficit; clinical follow-up recommended.');
       break;
     }
+    case 'metronome_tapping': {
+      const attentionScore = extraData.attentionScore ?? accuracy ?? 0;
+      const avgOffset = extraData.avgOffsetMs ?? avgReactionMs ?? 150;
+      const variance = extraData.timingVariance ?? 0;
+      eff.stressReduction    = 4;
+      eff.dopamineActivation = Math.min(10, Math.round((attentionScore / 12) + ((extraData.streakMax || 0) * 0.25)));
+      eff.focusScore         = Math.min(10, Math.round(attentionScore / 10));
+      eff.arousalLevel       = attentionScore < 40 || variance > 75 ? 'high' : attentionScore < 65 ? 'moderate' : 'low';
+      eff.clinicalNote       = extraData.clinicalNote ||
+        `Rhythm Sync: attention ${attentionScore}/100, avg offset ${avgOffset}ms, variance ${variance}ms.`;
+      break;
+    }
     case 'perception_probe': {
       eff.stressReduction    = 2;
       eff.dopamineActivation = 3;
@@ -132,9 +159,11 @@ const computeHealthProfile = (gameSessions, worries, destroyedCount) => {
 
   const getGame = (id) => gameSessions.find(g => g.gameId === id);
   const squeeze    = getGame('squeeze_release');
+  const spark      = getGame('spark_canvas');
   const colorSort  = getGame('color_sort');
   const memory     = getGame('memory_pulse');
   const numDash    = getGame('number_dash');
+  const metronome  = getGame('metronome_tapping');
   const perception = getGame('perception_probe');
   const wordSmash  = getGame('word_smash');
 
@@ -143,17 +172,26 @@ const computeHealthProfile = (gameSessions, worries, destroyedCount) => {
     ? worries.reduce((s,w) => s + (w.weight||5), 0) / worries.length : 5;
   const worryStress = (avgWorryWeight / 10) * 4;
   const squeezeStress = squeeze ? (100 - (squeeze.extraData?.avgQuality||50)) / 25 : 0;
+  const sparkStress = spark ? (
+    (spark.extraData?.stroke_energy === 'high' ? 1.5 : 0) +
+    (spark.extraData?.hesitation_index === 'high' ? 1.5 : 0) +
+    ((spark.extraData?.canvas_coverage || 0) < 12 ? 1 : 0)
+  ) : 0;
   const perceptionRigid = perception ? (perception.accuracy === 100 ? 0 : 4) : 0;
   const wordStress    = wordSmash ? Math.min(2, wordSmash.score / 5) : 0;
-  const stressScore   = Math.min(10, Math.round((worryStress + squeezeStress + perceptionRigid + wordStress) * 10) / 10);
+  const stressScore   = Math.min(10, Math.round((worryStress + squeezeStress + sparkStress + perceptionRigid + wordStress) * 10) / 10);
 
   // ADHD Signal (0-10, higher = more ADHD indicators)
   const memLevel     = memory?.extraData?.maxLevel || 0;
   const numTime      = numDash?.extraData?.bestTime || 999;
+  const rhythmScore  = metronome?.extraData?.attentionScore;
+  const rhythmVar    = metronome?.extraData?.timingVariance || 0;
   const colorErr     = colorSort?.extraData?.mistakes || 0;
   const adhdSignal   = Math.min(10, Math.round((
     (memLevel < 4 ? 3 : memLevel < 6 ? 1.5 : 0) +
-    (numTime > 60 ? 3 : numTime > 45 ? 1.5 : 0) +
+    (metronome
+      ? (rhythmScore < 35 ? 3 : rhythmScore < 60 ? 1.5 : 0) + (rhythmVar > 80 ? 1 : 0)
+      : (numTime > 60 ? 3 : numTime > 45 ? 1.5 : 0)) +
     (colorErr > 8 ? 2 : colorErr > 4 ? 1 : 0) +
     (worries.filter(w => w.weight >= 7).length > 3 ? 2 : 0)
   ) * 10) / 10);
@@ -161,8 +199,10 @@ const computeHealthProfile = (gameSessions, worries, destroyedCount) => {
   // Anxiety Level (0-10)
   const squeezeQ   = squeeze?.extraData?.avgQuality || 100;
   const rigidAnx   = perception ? (perception.accuracy === 100 ? 0 : 4) : 0;
+  const sparkAnx = spark ? (spark.extraData?.hesitation_index === 'high' ? 2 : spark.extraData?.hesitation_index === 'moderate' ? 1 : 0) : 0;
   const anxietyLevel = Math.min(10, Math.round((
     ((100 - squeezeQ) / 20) +
+    sparkAnx +
     rigidAnx +
     (avgWorryWeight > 7 ? 2 : avgWorryWeight > 5 ? 1 : 0)
   ) * 10) / 10);
@@ -1055,7 +1095,7 @@ function SessionReportPanel({ gameSessions, worries, destroyedCount, onDownloadR
   return (
     <motion.div initial={{opacity:0,y:12}} animate={{opacity:1,y:0}} style={{ marginTop:22, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:20, overflow:'hidden' }}>
       {/* Header */}
-      <button onClick={() => setExpanded(e=>!e)}
+      <div onClick={() => setExpanded(e=>!e)} role="button" tabIndex={0} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded(ex=>!ex); } }}
         style={{ width:'100%', padding:'16px 20px', display:'flex', justifyContent:'space-between', alignItems:'center', background:'none', border:'none', cursor:'pointer', textAlign:'left' }}>
         <div style={{ display:'flex', alignItems:'center', gap:12 }}>
           <span style={{ fontSize:15, fontWeight:800, color:'var(--text-1)', letterSpacing:'-0.03em' }}>🧬 Behavioral Health Profile</span>
@@ -1073,7 +1113,7 @@ function SessionReportPanel({ gameSessions, worries, destroyedCount, onDownloadR
           )}
           {expanded ? <ChevronUp size={15} color="var(--text-3)"/> : <ChevronDown size={15} color="var(--text-3)"/>}
         </div>
-      </button>
+      </div>
 
       <AnimatePresence>
         {expanded && (
@@ -1143,11 +1183,11 @@ function GameCard({ game, onClick }) {
 }
 
 const GAME_DEFS = [
-  { id:'squeeze_release', name:'Squeeze Release', emoji:'🫳', color:'#ff6b8a', tagline:'Release built-up tension', mechanic:'Hold & release', side:'left',  Component:SqueezeRelease },
+  { id:'metronome_tapping', name:'Rhythm Sync', emoji:'IM', color:'#00e5ff', tagline:'Tap in sync with a beat', mechanic:'Tap to beat', side:'right', Component:MetronomeTapping },
+  { id:'spark_canvas', name:'Spark Canvas', emoji:'✦', color:'#c4b5fd', tagline:'Draw a world from feeling', mechanic:'30-sec sketch', side:'left', Component:SparkCanvas },
   { id:'color_sort',      name:'Color Sort',      emoji:'🎨', color:'#00e5ff', tagline:'Sort by colour logic',   mechanic:'Drag & match',  side:'left',  Component:ColorSort      },
   { id:'word_smash',      name:'Word Smash',      emoji:'💥', color:'#c4b5fd', tagline:'Crush negativity',       mechanic:'Click to smash', side:'left', Component:WordSmash      },
   { id:'memory_pulse',    name:'Memory Pulse',    emoji:'🧠', color:'#a78bfa', tagline:'Test working memory',    mechanic:'Sequence repeat',side:'right', Component:MemoryPulse    },
-  { id:'number_dash',     name:'Number Dash',     emoji:'🔢', color:'#ffb300', tagline:'Schulte attention test', mechanic:'Order 1→16',    side:'right', Component:NumberDash     },
   { id:'perception_probe',name:'Perspective',     emoji:'👁️', color:'#5eead4', tagline:'Cognitive rigidity test', mechanic:'Illusion switch', side:'right', Component:PerceptionProbe    },
 ];
 
@@ -1237,7 +1277,7 @@ export default function CognitiveForge() {
   const handleGameSessionEnd = useCallback(rawMetrics => {
     const predictedEffects = derivePredictedEffects(rawMetrics.gameId, rawMetrics);
     setGameSessions(prev => [...prev, { ...rawMetrics, predictedEffects, completedAt: new Date().toISOString() }]);
-    setActiveGame(null);
+    if (rawMetrics.gameId !== 'metronome_tapping') setActiveGame(null);
     setReportMsg(`${rawMetrics.gameName} logged · ${rawMetrics.durationSeconds}s`);
     setTimeout(() => setReportMsg(null), 3000);
   }, []);
@@ -1269,8 +1309,14 @@ export default function CognitiveForge() {
         userId, source: 'manual', currentTask: 'Cognitive Forge session', vocalArousalScore: 5, sendToGuardian: false,
         sessionSnapshot: { initialAnxietyQuery: text, shatteredWorryBlocks: worries.map(w => ({ id: w.uuid || String(w.id), text: w.worry, weight: w.weight, status: w.status || 'active' })), gameSessions, notes: gameSessions.length ? `${gameSessions.map(s => `${s.gameName}(${s.durationSeconds}s,score:${s.score})`).join(', ')}.` : 'No games played.' }
       });
-      if (res.downloadUrl) window.open(res.downloadUrl, '_blank', 'noopener,noreferrer');
-      setReportMsg(`PDF ready · Risk: ${res.riskLevel}`);
+      
+      // Use the memory-safe download helper
+      if (res.reportId) {
+        setReportMsg('PDF ready · Downloading…');
+        const filename = `AuraOS-Forge-Report-${String(res.reportId).slice(-6)}.pdf`;
+        await clinicalApi.downloadReportPdfBuffer(res.reportId, filename);
+        setReportMsg(`Success · Risk: ${res.riskLevel}`);
+      }
       setTimeout(() => setReportMsg(null), 5000);
     } catch (e) {
       setReportMsg(`PDF failed: ${e.message}`);
@@ -1335,10 +1381,19 @@ export default function CognitiveForge() {
                 </div>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:13}}>
                   <span style={{fontSize:11,color:'var(--text-3)'}}>{text.length} chars</span>
-                  <motion.button className="btn btn-primary" onClick={handleExtract} disabled={isLoading||text.trim().length<5} whileHover={{scale:1.02}} whileTap={{scale:0.97}}>
-                    {isLoading?<span className="spinner"/>:<Sparkles size={13}/>}
-                    {isLoading?'Extracting…':'Forge the blocks'}
-                  </motion.button>
+                  <CalmButton
+                    as={motion.button}
+                    onClick={handleExtract}
+                    disabled={isLoading || text.trim().length < 5} 
+                    whileHover={{ scale: 1.02 }} 
+                    whileTap={{ scale: 0.97 }}
+                    className="px-8 py-3"
+                  >
+                    <div className="flex items-center gap-2">
+                       {isLoading ? <span className="spinner" /> : <Sparkles size={13} />}
+                       {isLoading ? 'Extracting…' : 'Forge the blocks'}
+                    </div>
+                  </CalmButton>
                 </div>
                 {error&&<p style={{marginTop:9,fontSize:12.5,color:'#fca5a5'}}>{error}</p>}
               </motion.div>
@@ -1478,7 +1533,7 @@ export default function CognitiveForge() {
                 initial={{scale:0.9,y:24}} animate={{scale:1,y:0}} exit={{scale:0.88,opacity:0}}
                 className="relative z-10 w-full"
                 style={{
-                  maxWidth: activeGame==='number_dash'?480:activeGame==='memory_pulse'?460:activeGame==='perception_probe'?600:530,
+                  maxWidth: activeGame==='spark_canvas'?620:activeGame==='metronome_tapping'?560:activeGame==='number_dash'?480:activeGame==='memory_pulse'?460:activeGame==='perception_probe'?600:530,
                   maxHeight:'88dvh', minHeight:460,
                   background:'rgba(7,16,32,0.98)',
                   border:`1px solid ${activeGameDef?.color||'rgba(255,255,255,0.1)'}30`,
@@ -1498,7 +1553,7 @@ export default function CognitiveForge() {
                   </button>
                 </div>
                 <div style={{flex:1,overflow:'hidden',display:'flex',flexDirection:'column',minHeight:350,position:'relative'}}>
-                  <ActiveGameComponent onSessionEnd={handleGameSessionEnd}/>
+                  <ActiveGameComponent onSessionEnd={handleGameSessionEnd} onClose={()=>setActiveGame(null)}/>
                 </div>
               </motion.div>
             </motion.div>

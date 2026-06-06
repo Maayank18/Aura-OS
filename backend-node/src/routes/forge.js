@@ -2,6 +2,7 @@ import express from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import {
   extractWorriesHandler,
+  transformSketchHandler,
   destroyWorryHandler,
   vaultWorryHandler,
   getVaultHandler,
@@ -11,6 +12,7 @@ import {
 const router = express.Router();
 
 router.post('/extract', asyncHandler(extractWorriesHandler));
+router.post('/transform-sketch', asyncHandler(transformSketchHandler));
 router.post('/destroy', asyncHandler(destroyWorryHandler));
 router.post('/vault', asyncHandler(vaultWorryHandler));
 router.get('/vault/:userId', asyncHandler(getVaultHandler));

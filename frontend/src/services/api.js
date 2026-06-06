@@ -8,15 +8,7 @@ const BASE        = '/api';       // Vite proxy → http://localhost:5001
 const AI_TIMEOUT  = 25_000;       // 25s — Gemini/Groq cold-start allowance
 const API_TIMEOUT = 8_000;        // 8s  — DB + health endpoints
 
-const parseJsonSafe = async (res) => {
-  const raw = await res.text();
-  if (!raw) return {};
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return { error: raw.slice(0, 300) || null };
-  }
-};
+const VISION_TIMEOUT = 60_000;
 
 const req = async (method, path, body, timeoutMs = API_TIMEOUT) => {
   const controller = new AbortController();
@@ -30,7 +22,23 @@ const req = async (method, path, body, timeoutMs = API_TIMEOUT) => {
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
 
-    const json = await parseJsonSafe(res);
+    // Handle empty responses (e.g. when backend is down and proxy returns nothing)
+    const text = await res.text();
+    if (!text) {
+      throw new Error(
+        `Server returned an empty response (${res.status}). Is the backend running?`
+      );
+    }
+
+    let json;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      throw new Error(
+        `Server returned non-JSON response (${res.status}). The backend may be down or misconfigured.`
+      );
+    }
+
     if (!res.ok || !json.success) {
       throw new Error(json.error || `Request failed (${res.status})`);
     }
@@ -64,6 +72,8 @@ export const stateApi = {
 // ── Cognitive Forge ───────────────────────────────────────────────────────────
 export const forgeApi = {
   extract:       (text, userId)                   => postAI('/forge/extract', { text, userId }),
+  transformSketch: (imageBase64, strokeMetrics)   =>
+                   req('POST', '/forge/transform-sketch', { imageBase64, strokeMetrics }, VISION_TIMEOUT),
   destroy:       (userId, worryId)                => post('/forge/destroy', { userId, worryId }),
   vault:         (userId, worryId, worry, weight) =>
                    post('/forge/vault', { userId, worryId, worry, weight }),

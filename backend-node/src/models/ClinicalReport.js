@@ -57,15 +57,20 @@ const DeliveryStatusSchema = new mongoose.Schema(
   { _id:false }
 );
 
+
 const ClinicalReportSchema = new mongoose.Schema(
   {
     userId:              { type:String, required:true, index:true },
+    patientId:           { type:mongoose.Schema.Types.ObjectId, ref:'Patient', default:null, index:true },
+    guardianId:          { type:mongoose.Schema.Types.ObjectId, ref:'Guardian', default:null, index:true },
+    dateRangeDays:       { type:Number, min:1, max:90, default:null },
     source:              { type:String, enum:['panic','manual','auto'], default:'manual' },
     currentTask:         { type:String, default:'', maxlength:500 },
     selectedBlocker:     { type:String, default:'', maxlength:200 },
     vocalArousalScore:   { type:Number, min:1, max:10, default:5 },
     initialAnxietyQuery: { type:String, default:'', maxlength:3000 },
     aiStressSummary:     { type:String, default:'', maxlength:2500 },
+    aiBrief:             { type:Object, default: {} }, // 🆕 structured deep diagnosis
     riskLevel:           { type:String, enum:['watch','pre-burnout','acute-distress'], default:'watch' },
     shatteredWorryBlocks:{ type:[ReportWorrySchema],  default:[] },
     timelineMicroquests: { type:[ReportQuestSchema],  default:[] },
@@ -77,10 +82,14 @@ const ClinicalReportSchema = new mongoose.Schema(
       phone:    { type:String, default:'' },
       relation: { type:String, default:'' },
     },
-    delivery: {
-      whatsapp: { type:DeliveryStatusSchema, default:() => ({}) },
-      email:    { type:DeliveryStatusSchema, default:() => ({}) },
+    patientSnapshot:     {
+      name:     { type:String, default:'' },
+      age:      { type:Number, default:null },
+      email:    { type:String, default:'' },
+      phone:    { type:String, default:'' },
     },
+    patientIntakeSnapshot:  { type:Object, default:{} },
+    guardianIntakeSnapshot: { type:Object, default:{} },
     meta: {
       notes:       { type:String, default:'', maxlength:1000 },
       generatedAt: { type:Date, default:Date.now },

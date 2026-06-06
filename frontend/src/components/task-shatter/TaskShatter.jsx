@@ -24,35 +24,35 @@ import SymptomInterruption from './SymptomInterruption.jsx';
 import useFocusTimer from '../../hooks/useFocusTimer.js';
 import useTelemetry from '../../hooks/useTelemetry.js';
 import useIdleDetection from '../../hooks/useIdleDetection.js';
+import CalmButton from '../CalmButton/CalmButton.jsx';
 
 /* ── Constants ──────────────────────────────────────────────────────── */
 const COLORS = [
-  { id:'cyan',   border:'#00e5ff', glow:'rgba(0,229,255,0.4)',   bg:'rgba(0,229,255,0.06)'   },
-  { id:'purple', border:'#c4b5fd', glow:'rgba(196,181,253,0.4)', bg:'rgba(196,181,253,0.06)' },
-  { id:'coral',  border:'#ff6b8a', glow:'rgba(255,107,138,0.4)', bg:'rgba(255,107,138,0.06)' },
-  { id:'amber',  border:'#ffb300', glow:'rgba(255,179,0,0.4)',   bg:'rgba(255,179,0,0.06)'   },
-  { id:'green',  border:'#00e676', glow:'rgba(0,230,118,0.4)',   bg:'rgba(0,230,118,0.06)'   },
+  { id:'cyan',   border:'var(--cyan)', glow:'var(--cyan-glow)',   bg:'rgba(0,229,255,0.06)'   },
+  { id:'purple', border:'var(--purple-soft)', glow:'var(--purple-glow)', bg:'rgba(196,181,253,0.06)' },
+  { id:'coral',  border:'var(--coral)', glow:'rgba(255,107,138,0.4)', bg:'rgba(255,107,138,0.06)' },
+  { id:'amber',  border:'var(--amber)', glow:'rgba(255,179,0,0.4)',   bg:'rgba(255,179,0,0.06)'   },
+  { id:'green',  border:'var(--green)', glow:'rgba(0,230,118,0.4)',   bg:'rgba(0,230,118,0.06)'   },
 ];
 
-// Research-backed blocker categories with env hints
 const BLOCKERS = [
   {
     id: 'too_noisy',
-    label: 'Too noisy / Distracted',
+    label: 'Sensory Overload (Distracted)',
     icon: Volume2,
-    color: '#00e5ff',
-    desc: "Environment is loud and I can't focus",
+    color: 'var(--cyan)',
+    desc: "External stimuli are blocking executive function. AI will prioritize environmental control.",
     envHint: 'brown_noise',
-    tip: 'Brown noise will activate',
+    tip: 'Acoustic masking (Brown Noise) activated',
   },
   {
     id: 'brain_fog',
-    label: 'Brain fog / Exhaustion',
+    label: 'Cognitive Fatigue (Brain Fog)',
     icon: Brain,
-    color: '#c4b5fd',
-    desc: 'My mind feels slow and heavy today',
+    color: 'var(--purple-soft)',
+    desc: 'Internal energy depletion. AI will atomize tasks to eliminate cognitive load.',
     envHint: 'deep_focus_dark',
-    tip: 'Screen dims for focus',
+    tip: 'Optical strain reduction (Dark Mode) activated',
   },
 ];
 
@@ -125,7 +125,7 @@ function FocusTimer({ isActive, durationMinutes = 2, onComplete }) {
           position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 10, fontWeight: 800, color,
         }}>
-          {started ? `${mins}:${String(secs).padStart(2, '0')}` : <Clock size={13} color="rgba(139,175,194,0.5)" />}
+          {started ? `${mins}:${String(secs).padStart(2, '0')}` : <Clock size={13} color="var(--text-3)" />}
         </div>
       </div>
     </div>
@@ -223,7 +223,7 @@ function FragmentCard({ frag, onPositionChange, onDelete, onTextChange, onColorC
       }}
     >
       <div style={{
-        background: dragging ? 'rgba(10,20,42,0.98)' : 'rgba(6,14,30,0.9)',
+        background: dragging ? 'var(--theme-dragging-bg)' : 'var(--theme-default-bg)',
         backdropFilter: 'blur(20px)', borderRadius: 18,
         border: `1px solid ${color.border}`,
         boxShadow: dragging
@@ -251,11 +251,11 @@ function FragmentCard({ frag, onPositionChange, onDelete, onTextChange, onColorC
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                 style={{ display: 'flex', gap: 3 }}>
                 <button onClick={(e) => { e.stopPropagation(); setEditing(true); setEditVal(frag.text); }}
-                  style={{ padding: 3, borderRadius: 6, background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)', display: 'flex' }}>
+                  style={{ padding: 3, borderRadius: 6, background: 'var(--bg-glass)', color: 'var(--text-3)', display: 'flex' }}>
                   <Edit2 size={10} />
                 </button>
                 <button onClick={(e) => { e.stopPropagation(); onDelete(frag.id); }}
-                  style={{ padding: 3, borderRadius: 6, background: 'rgba(255,107,138,0.1)', color: '#ff6b8a', display: 'flex' }}>
+                  style={{ padding: 3, borderRadius: 6, background: 'rgba(255,107,138,0.1)', color: 'var(--coral)', display: 'flex' }}>
                   <Trash2 size={10} />
                 </button>
               </motion.div>
@@ -268,7 +268,7 @@ function FragmentCard({ frag, onPositionChange, onDelete, onTextChange, onColorC
             <input autoFocus value={editVal} onChange={(e) => setEditVal(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditing(false); }}
               onClick={(e) => e.stopPropagation()}
-              style={{ flex: 1, background: 'rgba(255,255,255,0.06)', border: `1px solid ${color.border}`, borderRadius: 8, padding: '6px 8px', color: '#e8f4fb', fontSize: 13, fontFamily: 'inherit', outline: 'none' }}
+              style={{ flex: 1, background: 'var(--bg-glass)', border: `1px solid ${color.border}`, borderRadius: 8, padding: '6px 8px', color: 'var(--text-1)', fontSize: 13, fontFamily: 'inherit', outline: 'none' }}
             />
             <button onClick={commitEdit} style={{ color: color.border, display: 'flex' }}><Check size={13} /></button>
           </div>
@@ -328,36 +328,47 @@ function ReportOverlay({ onClose, reportInfo, error }) {
   const steps = ['Compiling session data', 'Generating AI summary', 'Building PDF', 'Dispatching to guardian'];
   const [step, setStep] = useState(0);
 
-  useEffect(() => {
-    if (reportInfo || error) return;
-    const t = setInterval(() => setStep((s) => Math.min(s + 1, steps.length - 1)), 1800);
-    return () => clearInterval(t);
-  }, [reportInfo, error]); // eslint-disable-line
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleDownload = async () => {
+    const reportId = reportInfo?.reportId || reportInfo?._id;
+    if (!reportId || isDownloading) return;
+    setIsDownloading(true);
+    try {
+      const filename = `AuraOS-Report-${reportId.slice(-6)}.pdf`;
+      await clinicalApi.downloadReportPdfBuffer(reportId, filename);
+    } catch (e) {
+      console.error('[Download] Failed:', e);
+      alert('Download failed. Please try again.');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       style={{
         position: 'fixed', inset: 0, zIndex: 600,
-        background: 'rgba(2,9,21,0.92)', backdropFilter: 'blur(24px)',
+        background: 'var(--bg-glass-deep)', backdropFilter: 'blur(24px)',
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 24,
       }}
     >
       {!reportInfo && !error ? (
         <>
-          <div style={{ width: 56, height: 56, border: '3px solid rgba(0,229,255,0.15)', borderTopColor: '#00e5ff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+          <div style={{ width: 56, height: 56, border: '3px solid var(--border)', borderTopColor: 'var(--cyan)', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
           <div style={{ textAlign: 'center' }}>
-            <p style={{ fontSize: 18, fontWeight: 700, color: '#e8f4fb', marginBottom: 20 }}>Generating your report…</p>
+            <p style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-1)', marginBottom: 20 }}>Generating your report…</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 320 }}>
               {steps.map((s, i) => (
                 <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <div style={{
                     width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
-                    background: i < step ? '#00e676' : i === step ? 'rgba(0,229,255,0.3)' : 'rgba(255,255,255,0.06)',
-                    border: i === step ? '2px solid #00e5ff' : 'none',
+                    background: i < step ? 'var(--green)' : i === step ? 'var(--cyan-glow)' : 'var(--bg-glass)',
+                    border: i === step ? '2px solid var(--cyan)' : 'none',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     transition: 'all 0.4s',
                   }}>
-                    {i < step && <Check size={11} color="#020915" strokeWidth={3} />}
+                    {i < step && <Check size={11} color="var(--bg-root)" strokeWidth={3} />}
                   </div>
                   <span style={{ fontSize: 13, color: i <= step ? 'var(--text-1)' : 'var(--text-3)', transition: 'color 0.4s' }}>{s}</span>
                 </div>
@@ -367,32 +378,33 @@ function ReportOverlay({ onClose, reportInfo, error }) {
         </>
       ) : error ? (
         <div style={{ textAlign: 'center', maxWidth: 400 }}>
-          <AlertTriangle size={40} color="#ff6b8a" style={{ margin: '0 auto 16px' }} />
-          <p style={{ fontSize: 16, fontWeight: 700, color: '#ff6b8a', marginBottom: 8 }}>Report generation failed</p>
+          <AlertTriangle size={40} color="var(--coral)" style={{ margin: '0 auto 16px' }} />
+          <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--coral)', marginBottom: 8 }}>Report generation failed</p>
           <p style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 20 }}>{error}</p>
           <button className="btn btn-secondary" onClick={onClose}>Close</button>
         </div>
       ) : (
         <div style={{ textAlign: 'center', maxWidth: 420 }}>
           <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 200 }}>
-            <div style={{ width: 70, height: 70, borderRadius: '50%', background: 'rgba(0,230,118,0.12)', border: '2px solid #00e676', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
-              <Check size={32} color="#00e676" strokeWidth={2.5} />
+            <div style={{ width: 70, height: 70, borderRadius: '50%', background: 'var(--bg-glass)', border: '2px solid var(--green)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+              <Check size={32} color="var(--green)" strokeWidth={2.5} />
             </div>
           </motion.div>
-          <p style={{ fontSize: 18, fontWeight: 800, color: '#e8f4fb', marginBottom: 8 }}>Report ready!</p>
+          <p style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-1)', marginBottom: 8 }}>Report ready!</p>
           <p style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 20 }}>
-            Risk level: <span style={{ color: reportInfo.riskLevel === 'acute-distress' ? '#ff6b8a' : '#ffb300', fontWeight: 700 }}>{reportInfo.riskLevel}</span>
+            Risk level: <span style={{ color: reportInfo.riskLevel === 'acute-distress' ? 'var(--coral)' : 'var(--amber)', fontWeight: 700 }}>{reportInfo.riskLevel}</span>
             {reportInfo.delivery?.whatsapp?.status === 'sent' && ' · Guardian notified via WhatsApp'}
             {reportInfo.delivery?.email?.status === 'sent' && ' · Email dispatched'}
           </p>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
-            {reportInfo.downloadUrl && (
+            {reportInfo.reportId && (
               <button className="btn btn-primary"
-                onClick={() => window.open(reportInfo.downloadUrl, '_blank', 'noopener,noreferrer')} style={{ fontSize: 13 }}>
-                <FileText size={13} /> Open PDF
+                onClick={handleDownload} disabled={isDownloading} style={{ fontSize: 13 }}>
+                {isDownloading ? <div className="spinner" style={{ width: 12, height: 12 }} /> : <FileText size={13} />}
+                {isDownloading ? 'Downloading…' : 'Download PDF'}
               </button>
             )}
-            <button className="btn btn-secondary" onClick={onClose} style={{ fontSize: 13 }}>Done</button>
+            <button className="btn btn-secondary" onClick={onClose} disabled={isDownloading} style={{ fontSize: 13 }}>Done</button>
           </div>
         </div>
       )}
@@ -718,9 +730,8 @@ export default function TaskShatter() {
   };
   const dotGrid = { position: 'absolute', inset: 0, pointerEvents: 'none', backgroundImage: 'radial-gradient(rgba(0,229,255,0.08) 1px, transparent 1px)', backgroundSize: '36px 36px', opacity: 0.25 };
 
-  /* ── PHASE: INPUT ─────────────────────────────────────────────────────── */
   if (phase === 'input') return (
-    <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', ...canvasBg }}>
+    <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', background: 'var(--bg-root)' }}>
       <div style={{ ...dotGrid }} />
       <motion.div initial={{ opacity: 0, y: 30, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ type: 'spring', stiffness: 160, damping: 18 }}
         style={{ width: '100%', maxWidth: 560, padding: '0 22px', position: 'relative', zIndex: 1 }}>
@@ -729,18 +740,18 @@ export default function TaskShatter() {
             style={{
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
               width: 56, height: 56, borderRadius: '50%', marginBottom: 18,
-              background: 'conic-gradient(from 180deg,#7c3aed,#00e5ff,#00bfa5,#7c3aed)',
-              boxShadow: '0 0 28px rgba(0,229,255,0.35),0 0 60px rgba(124,58,237,0.2)',
+              background: 'conic-gradient(from 180deg, var(--purple), var(--cyan), var(--teal), var(--purple))',
+              boxShadow: '0 0 28px var(--cyan-glow),0 0 60px var(--purple-glow)',
             }}>
             <Zap size={24} color="white" />
           </motion.div>
-          <h1 className="title-font" style={{ fontSize: 'clamp(26px,5vw,36px)', fontWeight: 800, letterSpacing: '-0.045em', color: '#e8f4fb', lineHeight: 1.15, marginBottom: 10 }}>
+          <h1 style={{ fontSize: 'clamp(26px,5vw,36px)', fontWeight: 800, letterSpacing: '-0.045em', color: 'var(--text-1)', lineHeight: 1.15, marginBottom: 10 }}>
             What's{' '}
-            <span style={{ background: 'linear-gradient(135deg,#00e5ff,#c4b5fd)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+            <span style={{ background: 'linear-gradient(135deg, var(--cyan), var(--purple-soft))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
               stopping you?
             </span>
           </h1>
-          <p style={{ fontSize: 14.5, color: '#8bafc2', lineHeight: 1.65 }}>
+          <p style={{ fontSize: 14.5, color: 'var(--text-2)', lineHeight: 1.65 }}>
             Describe the task that's paralysing you. Aura's Coach will break it into 2-minute steps tailored to how you feel right now.
           </p>
         </div>
@@ -750,30 +761,33 @@ export default function TaskShatter() {
             onKeyDown={(e) => { if (e.key === 'Enter' && e.metaKey) handleShowCoach(); }}
             rows={4} placeholder="e.g. Build the backend for my project..."
             style={{
-              width: '100%', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(0,229,255,0.2)',
-              borderRadius: 18, padding: '18px 22px', color: '#e8f4fb', fontFamily: 'inherit',
+              width: '100%', background: 'var(--bg-glass)', border: '1px solid var(--border)',
+              borderRadius: 18, padding: '18px 22px', color: 'var(--text-1)', fontFamily: 'inherit',
               fontSize: 15.5, lineHeight: 1.7, resize: 'none', outline: 'none',
               boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)', transition: 'border-color 0.2s, box-shadow 0.2s',
             }}
-            onFocus={(e) => { e.target.style.borderColor = 'rgba(0,229,255,0.5)'; e.target.style.boxShadow = '0 0 0 3px rgba(0,229,255,0.1)'; }}
-            onBlur={(e) => { e.target.style.borderColor = 'rgba(0,229,255,0.2)'; e.target.style.boxShadow = 'none'; }}
+            onFocus={(e) => { e.target.style.borderColor = 'var(--cyan)'; e.target.style.boxShadow = '0 0 0 3px var(--cyan-glow)'; }}
+            onBlur={(e) => { e.target.style.borderColor = 'var(--border)'; e.target.style.boxShadow = 'none'; }}
           />
-          <div style={{ position: 'absolute', bottom: 13, right: 16, fontSize: 11, color: 'rgba(139,175,194,0.4)', fontWeight: 500 }}>⌘↵</div>
+          <div style={{ position: 'absolute', bottom: 13, right: 16, fontSize: 11, color: 'var(--text-3)', fontWeight: 500 }}>⌘↵</div>
         </div>
 
-        <motion.button onClick={handleShowCoach} disabled={taskText.trim().length < 3}
-          whileHover={{ scale: 1.02, boxShadow: '0 12px 40px rgba(124,58,237,0.45)' }} whileTap={{ scale: 0.97 }}
-          style={{
-            width: '100%', padding: '17px', background: 'linear-gradient(135deg,#5b21b6,#7c3aed,#00b4d8)',
-            backgroundSize: '200% 200%', animation: 'gradSpin 6s ease infinite',
-            border: 'none', borderRadius: 16, color: 'white', fontFamily: 'inherit',
-            fontSize: 16, fontWeight: 800, letterSpacing: '-0.025em',
-            cursor: taskText.trim().length < 3 ? 'not-allowed' : 'pointer',
-            opacity: taskText.trim().length < 3 ? 0.45 : 1,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-          }}>
-          <Brain size={18} /> Talk to Aura Coach <ArrowRight size={16} />
-        </motion.button>
+        <div className="flex justify-center mt-6">
+          <CalmButton
+            onClick={handleShowCoach}
+            disabled={taskText.trim().length < 3}
+            as={motion.button}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.97 }}
+            className="w-auto"
+          >
+            <div className="flex items-center justify-center gap-2.5 px-8 py-2.5">
+              <Brain size={18} /> 
+              <span className="text-sm font-bold tracking-tight">Talk to Aura Coach</span> 
+              <ArrowRight size={16} />
+            </div>
+          </CalmButton>
+        </div>
         {error && <p style={{ marginTop: 14, fontSize: 13, color: '#ffb3c1', textAlign: 'center' }}>{error}</p>}
       </motion.div>
     </div>
@@ -781,20 +795,20 @@ export default function TaskShatter() {
 
   /* ── PHASE: COACHING — streamlined single-screen blocker selection ──── */
   if (phase === 'coaching') return (
-    <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', ...canvasBg }}>
+    <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', background: 'var(--bg-root)' }}>
       <div style={{ ...dotGrid }} />
       <motion.div initial={{ opacity: 0, scale: 0.93, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={{ type: 'spring', stiffness: 220, damping: 22 }}
-        style={{ width: '100%', maxWidth: 500, padding: '0 22px', position: 'relative', zIndex: 1 }}>
-        <div className="glass" style={{ borderRadius: 28, padding: '34px 30px' }}>
+        style={{ width: '100%', maxWidth: 560, padding: '0 22px', position: 'relative', zIndex: 1 }}>
+        <div style={{ background: 'var(--bg-glass-deep)', backdropFilter: 'blur(24px)', border: '1px solid var(--border)', borderRadius: 28, padding: '34px 30px' }}>
           {/* Task preview */}
-          <div style={{ background: 'rgba(0,229,255,0.04)', border: '1px solid rgba(0,229,255,0.12)', borderRadius: 14, padding: '12px 16px', marginBottom: 24 }}>
-            <p style={{ fontSize: 10.5, color: '#00e5ff', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>Breaking down</p>
-            <p style={{ fontSize: 14, color: '#e8f4fb', fontWeight: 600, lineHeight: 1.4 }}>
+          <div style={{ background: 'var(--bg-glass)', border: '1px solid var(--border)', borderRadius: 14, padding: '12px 16px', marginBottom: 24 }}>
+            <p style={{ fontSize: 10.5, color: 'var(--cyan)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>Breaking down</p>
+            <p style={{ fontSize: 14, color: 'var(--text-1)', fontWeight: 600, lineHeight: 1.4 }}>
               {taskText.length > 60 ? taskText.slice(0, 60) + '…' : taskText}
             </p>
           </div>
 
-          <p style={{ fontSize: 14, color: '#8bafc2', lineHeight: 1.6, marginBottom: 20, textAlign: 'center' }}>
+          <p style={{ fontSize: 14, color: 'var(--text-2)', lineHeight: 1.6, marginBottom: 20, textAlign: 'center' }}>
             One quick question — what's the main thing holding you back right now?
           </p>
 
@@ -807,34 +821,38 @@ export default function TaskShatter() {
                   whileTap={{ scale: 0.975 }}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 14, padding: '15px 18px',
-                    background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)',
+                    background: 'var(--bg-glass)', border: '1px solid var(--border)',
                     borderRadius: 16, cursor: 'pointer', textAlign: 'left',
                     transition: 'border-color 0.2s, background 0.2s',
                   }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = `${b.color}08`; e.currentTarget.style.borderColor = `${b.color}30`; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.025)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-glass-h)'; e.currentTarget.style.borderColor = 'var(--border-h)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--bg-glass)'; e.currentTarget.style.borderColor = 'var(--border)'; }}
                 >
                   <div style={{
                     width: 44, height: 44, borderRadius: 13,
-                    background: `${b.color}10`, border: `1px solid ${b.color}25`,
+                    background: 'var(--bg-glass-h)', border: '1px solid var(--border)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                   }}>
                     <Icon size={20} color={b.color} />
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <p style={{ fontSize: 14, fontWeight: 700, color: '#e8f4fb', marginBottom: 3 }}>{b.label}</p>
-                    <p style={{ fontSize: 12, color: '#4a6275' }}>{b.desc}</p>
+                  <div style={{ flex: 1, paddingRight: 10 }}>
+                    <p style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--text-1)', marginBottom: 4 }}>{b.label}</p>
+                    <p style={{ fontSize: 12.5, color: 'var(--text-2)', lineHeight: 1.4, marginBottom: 8 }}>{b.desc}</p>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: `${b.color}15`, padding: '4px 10px', borderRadius: 6 }}>
+                      <span style={{ fontSize: 11, color: b.color, fontWeight: 600, letterSpacing: '0.02em' }}>
+                        {b.tip}
+                      </span>
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3, flexShrink: 0 }}>
-                    <ChevronRight size={14} color="rgba(139,175,194,0.3)" />
-                    <span style={{ fontSize: 9.5, color: b.color, opacity: 0.7, whiteSpace: 'nowrap' }}>{b.tip}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <ChevronRight size={18} color="var(--text-3)" />
                   </div>
                 </motion.button>
               );
             })}
           </div>
 
-          <button onClick={() => setPhase('input')} style={{ display: 'block', margin: '18px auto 0', fontSize: 12, color: '#4a6275', background: 'none', border: 'none', cursor: 'pointer' }}>
+          <button onClick={() => setPhase('input')} style={{ display: 'block', margin: '18px auto 0', fontSize: 12, color: 'var(--text-3)', background: 'none', border: 'none', cursor: 'pointer' }}>
             ← Change task
           </button>
         </div>
@@ -872,13 +890,13 @@ export default function TaskShatter() {
           />
         ))}
         <motion.div animate={{ scale: [1, 1.25, 1], opacity: [0.6, 1, 0.6] }} transition={{ duration: 1.4, repeat: Infinity }}
-          style={{ position: 'absolute', top: '50%', left: '50%', width: 26, height: 26, borderRadius: '50%', marginLeft: -13, marginTop: -13, background: 'radial-gradient(circle,#00e5ff,#7c3aed)', boxShadow: '0 0 18px rgba(0,229,255,0.6)' }} />
+          style={{ position: 'absolute', top: '50%', left: '50%', width: 26, height: 26, borderRadius: '50%', marginLeft: -13, marginTop: -13, background: 'radial-gradient(circle, var(--cyan), var(--purple))', boxShadow: '0 0 18px var(--cyan-glow)' }} />
       </div>
       <div style={{ textAlign: 'center', position: 'relative', zIndex: 1 }}>
-        <p style={{ fontSize: 17, fontWeight: 700, color: '#e8f4fb', letterSpacing: '-0.03em', marginBottom: 8 }}>
+        <p style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-1)', letterSpacing: '-0.03em', marginBottom: 8 }}>
           {selectedBlocker ? `Calibrating for "${selectedBlocker.label.toLowerCase()}"…` : 'Shattering the task…'}
         </p>
-        <p style={{ fontSize: 13, color: '#8bafc2' }}>Generating 2-minute micro-steps just for you</p>
+        <p style={{ fontSize: 13, color: 'var(--text-2)' }}>Generating 2-minute micro-steps just for you</p>
       </div>
     </div>
   );
@@ -898,13 +916,13 @@ export default function TaskShatter() {
         )}
         <div style={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 22, ...canvasBg }}>
           <motion.div initial={{ scale: 0.3, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 200, damping: 15 }}>
-            <Trophy size={68} color="#ffb300" style={{ filter: 'drop-shadow(0 0 20px rgba(255,179,0,0.5))' }} />
+            <Trophy size={68} color="var(--amber)" style={{ filter: 'drop-shadow(0 0 20px var(--amber-glow))' }} />
           </motion.div>
           <div style={{ textAlign: 'center' }}>
-            <h1 style={{ fontSize: 32, fontWeight: 800, color: '#e8f4fb', letterSpacing: '-0.04em', marginBottom: 8 }}>Completely shattered. ✦</h1>
-            <p style={{ color: '#8bafc2', fontSize: 14 }}>{originalTask}</p>
+            <h1 style={{ fontSize: 32, fontWeight: 800, color: 'var(--text-1)', letterSpacing: '-0.04em', marginBottom: 8 }}>Completely shattered. ✦</h1>
+            <p style={{ color: 'var(--text-2)', fontSize: 14 }}>{originalTask}</p>
             {questStreak >= 3 && (
-              <div style={{ marginTop: 12, fontSize: 13, color: '#ffb300', fontWeight: 700 }}>
+              <div style={{ marginTop: 12, fontSize: 13, color: 'var(--amber)', fontWeight: 700 }}>
                 🔥 {questStreak}-quest streak — incredible focus!
               </div>
             )}
@@ -944,9 +962,9 @@ export default function TaskShatter() {
             <AnimatePresence>
               {coachData?.coachMessage && (
                 <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0 }}
-                  style={{ background: 'rgba(0,229,255,0.05)', border: '1px solid rgba(0,229,255,0.18)', borderRadius: 14, padding: '13px 18px', marginBottom: 18 }}>
-                  <p style={{ fontSize: 10.5, color: '#00e5ff', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>Aura Coach</p>
-                  <p style={{ fontSize: 13.5, color: '#e8f4fb', lineHeight: 1.65 }}>{coachData.coachMessage}</p>
+                  style={{ background: 'var(--bg-glass)', border: '1px solid var(--border)', borderRadius: 14, padding: '13px 18px', marginBottom: 18 }}>
+                  <p style={{ fontSize: 10.5, color: 'var(--cyan)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>Aura Coach</p>
+                  <p style={{ fontSize: 13.5, color: 'var(--text-1)', lineHeight: 1.65 }}>{coachData.coachMessage}</p>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -955,11 +973,11 @@ export default function TaskShatter() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
               <div>
                 <span className="badge badge-purple" style={{ marginBottom: 6 }}><Zap size={9} /> Focus block</span>
-                <p style={{ fontSize: 11.5, color: '#4a6275', marginTop: 4, maxWidth: 280 }}>{originalTask}</p>
+                <p style={{ fontSize: 11.5, color: 'var(--text-3)', marginTop: 4, maxWidth: 280 }}>{originalTask}</p>
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 {questStreak >= 2 && (
-                  <span style={{ fontSize: 11, color: '#ffb300', fontWeight: 700 }}>🔥 {questStreak}</span>
+                  <span style={{ fontSize: 11, color: 'var(--amber)', fontWeight: 700 }}>🔥 {questStreak}</span>
                 )}
                 <FocusTimer
                   key={`${currentQuestIndex}-${phase}`}
@@ -991,18 +1009,18 @@ export default function TaskShatter() {
                 style={{ background: 'linear-gradient(145deg,rgba(10,20,40,0.93),rgba(4,12,28,0.96))', borderRadius: 26, padding: '34px 32px', backdropFilter: 'blur(20px)' }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 18 }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#c4b5fd' }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--purple-soft)' }}>
                     Step {(currentQuestIndex || 0) + 1} of {focusQuests.length}
                   </span>
-                  <span style={{ fontSize: 11, color: '#4a6275', fontWeight: 600 }}>~{focusQuest.duration_minutes || 2} min</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 600 }}>~{focusQuest.duration_minutes || 2} min</span>
                 </div>
-                <p style={{ fontSize: 'clamp(17px,3vw,24px)', fontWeight: 800, lineHeight: 1.38, letterSpacing: '-0.03em', color: '#e8f4fb', marginBottom: 20 }}>
+                <p style={{ fontSize: 'clamp(17px,3vw,24px)', fontWeight: 800, lineHeight: 1.38, letterSpacing: '-0.03em', color: 'var(--text-1)', marginBottom: 20 }}>
                   {focusQuest.action}
                 </p>
                 {focusQuest.tip && (
-                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 14, display: 'flex', gap: 10 }}>
+                  <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14, display: 'flex', gap: 10 }}>
                     <span style={{ fontSize: 16 }}>💡</span>
-                    <p style={{ fontSize: 13.5, color: '#80deea', lineHeight: 1.65 }}>{focusQuest.tip}</p>
+                    <p style={{ fontSize: 13.5, color: 'var(--teal)', lineHeight: 1.65 }}>{focusQuest.tip}</p>
                   </div>
                 )}
 
@@ -1059,14 +1077,15 @@ export default function TaskShatter() {
         <div className="glass" style={{
           position: 'absolute', top: 0, left: 0, right: 0, zIndex: 200,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 22px',
-          borderTop: 'none', borderLeft: 'none', borderRight: 'none', borderRadius: 0,
+          background: 'var(--bg-glass-deep)', backdropFilter: 'blur(20px)',
+          borderBottom: '1px solid var(--border)',
         }}>
           <span className="badge badge-cyan"><Zap size={10} /> Shattered Canvas</span>
-          <p style={{ fontSize: 12, color: '#4a6275', fontWeight: 500, textAlign: 'center', flex: 1, margin: '0 16px' }}>
+          <p style={{ fontSize: 12, color: 'var(--text-2)', fontWeight: 500, textAlign: 'center', flex: 1, margin: '0 16px' }}>
             Drag steps into the timeline below, then launch
           </p>
           <div style={{ display: 'flex', gap: 8 }}>
-            <span style={{ fontSize: 12, color: '#4a6275', fontWeight: 600, alignSelf: 'center' }}>
+            <span style={{ fontSize: 12, color: 'var(--text-1)', fontWeight: 600, alignSelf: 'center' }}>
               {dockedCount}/{fragments.length}
             </span>
             <motion.button className="btn btn-ghost" onClick={handleReset} whileTap={{ scale: 0.92 }} style={{ fontSize: 12 }}>
@@ -1081,11 +1100,11 @@ export default function TaskShatter() {
             <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
               style={{
                 position: 'absolute', top: 58, left: '50%', transform: 'translateX(-50%)', zIndex: 190,
-                background: 'rgba(0,229,255,0.06)', backdropFilter: 'blur(16px)',
-                border: '1px solid rgba(0,229,255,0.16)', borderRadius: 14,
+                background: 'var(--bg-glass)', backdropFilter: 'blur(16px)',
+                border: '1px solid var(--border)', borderRadius: 14,
                 padding: '9px 18px', maxWidth: 500, textAlign: 'center',
               }}>
-              <p style={{ fontSize: 12.5, color: '#80deea', lineHeight: 1.55 }}>{coachData.coachMessage}</p>
+              <p style={{ fontSize: 12.5, color: 'var(--cyan)', lineHeight: 1.55 }}>{coachData.coachMessage}</p>
             </motion.div>
           )}
         </AnimatePresence>
@@ -1115,19 +1134,19 @@ export default function TaskShatter() {
           {allDocked && (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
               style={{ position: 'absolute', bottom: 148, left: '50%', transform: 'translateX(-50%)', zIndex: 300 }}>
-              <motion.button onClick={handleLaunchFocus}
-                whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
-                animate={{ boxShadow: ['0 6px 30px rgba(0,229,255,0.2)', '0 10px 50px rgba(0,229,255,0.45)', '0 6px 30px rgba(0,229,255,0.2)'] }}
-                transition={{ duration: 2.5, repeat: Infinity }}
-                style={{
-                  padding: '15px 38px', borderRadius: 999, border: 'none',
-                  background: 'linear-gradient(135deg,#00b4d8,#00e5ff)',
-                  color: '#020915', fontFamily: 'inherit', fontSize: 16, fontWeight: 800,
-                  letterSpacing: '-0.025em', cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', gap: 10,
-                }}>
-                <Play size={17} fill="#020915" /> Launch Focus Mode <ArrowRight size={15} />
-              </motion.button>
+            <CalmButton
+              as={motion.button}
+              onClick={handleLaunchFocus}
+              whileHover={{ scale: 1.04 }} 
+              whileTap={{ scale: 0.96 }}
+              className="px-10 py-4"
+            >
+              <div className="flex items-center gap-2.5">
+                <Play size={17} fill="currentColor" /> 
+                <span className="font-extrabold text-lg tracking-tight">Launch Focus Mode</span>
+                <ArrowRight size={15} />
+              </div>
+            </CalmButton>
             </motion.div>
           )}
         </AnimatePresence>
@@ -1135,14 +1154,14 @@ export default function TaskShatter() {
         {/* Timeline dock */}
         <div ref={dockRef} style={{
           position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 200,
-          background: 'rgba(2,9,21,0.93)', backdropFilter: 'blur(28px)',
-          borderTop: '1px solid rgba(0,229,255,0.12)',
-          boxShadow: '0 -8px 40px rgba(0,229,255,0.06)',
+          background: 'var(--bg-glass-deep)', backdropFilter: 'blur(28px)',
+          borderTop: '1px solid var(--border)',
+          boxShadow: '0 -8px 40px var(--cyan-glow)',
           padding: '12px 18px',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-            <p style={{ fontSize: 10.5, color: 'rgba(0,229,255,0.55)', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase' }}>⟵ Timeline ⟶</p>
-            <p style={{ fontSize: 10.5, color: '#4a6275', fontWeight: 500 }}>{dockedCount} placed · drag here to order</p>
+            <p style={{ fontSize: 10.5, color: 'var(--cyan)', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', opacity: 0.6 }}>⟵ Timeline ⟶</p>
+            <p style={{ fontSize: 10.5, color: 'var(--text-3)', fontWeight: 500 }}>{dockedCount} placed · drag here to order</p>
           </div>
           <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 2, scrollbarWidth: 'none' }}>
             {Array.from({ length: Math.max(MAX_SLOTS, fragments.length) }, (_, i) => {
@@ -1160,21 +1179,21 @@ export default function TaskShatter() {
                     display: 'flex', flexDirection: 'column', alignItems: frag ? 'flex-start' : 'center', justifyContent: frag ? 'flex-start' : 'center',
                     padding: frag ? '8px 11px' : '0', position: 'relative', transition: 'all 0.2s',
                   }}>
-                  <span style={{ position: 'absolute', top: 5, left: 8, fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', color: frag ? color.border : 'rgba(0,229,255,0.2)', textTransform: 'uppercase' }}>{i + 1}</span>
+                  <span style={{ position: 'absolute', top: 5, left: 8, fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', color: frag ? color.border : 'var(--cyan-glow)', textTransform: 'uppercase' }}>{i + 1}</span>
                   {frag ? (
                     <>
                       <div style={{ height: 14 }} />
-                      <p style={{ fontSize: 11.5, fontWeight: 700, color: '#e8f4fb', lineHeight: 1.35, marginBottom: 5 }}>
+                      <p style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-1)', lineHeight: 1.35, marginBottom: 5 }}>
                         {frag.text.slice(0, 52)}{frag.text.length > 52 ? '…' : ''}
                       </p>
                       <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
                         <span style={{ fontSize: 9, color: color.border, fontWeight: 600, opacity: 0.8 }}>~{frag.duration_minutes || 2}m</span>
                         <button onClick={() => ejectFromSlot(frag.id, i)}
-                          style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px' }}>×</button>
+                          style={{ fontSize: 10, color: 'var(--text-3)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px' }}>×</button>
                       </div>
                     </>
                   ) : (
-                    <p style={{ fontSize: 10, color: 'rgba(0,229,255,0.18)', fontWeight: 500 }}>Drop here</p>
+                    <p style={{ fontSize: 10, color: 'var(--cyan-glow)', fontWeight: 500, opacity: 0.4 }}>Drop here</p>
                   )}
                 </motion.div>
               );

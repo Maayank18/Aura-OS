@@ -161,12 +161,18 @@ export default function AuraVoice() {
       </div>
 
       {/* ═══════════════ LIVING CIRCUIT ORB ═══════════════ */}
-      <div style={{
+      <motion.div 
+        animate={{ y: [-6, 6, -6], rotate: [-0.5, 0.5, -0.5] }} 
+        transition={{ repeat: Infinity, duration: 8, ease: 'easeInOut' }}
+        style={{
         position:'relative',
         width:'min(360px,88vw)', height:'min(360px,88vw)',
         flexShrink:0, marginBottom:36,
-        borderRadius:20, overflow:'hidden',
-        background:'radial-gradient(ellipse at 45% 42%, #001e33 0%, #000d1c 42%, #00060f 100%)',
+        borderRadius:'50%', overflow:'hidden',
+        background:'radial-gradient(circle at 45% 42%, rgba(0,40,70,0.6) 0%, rgba(0,20,40,0.3) 40%, transparent 75%)',
+        boxShadow: `0 20px 50px rgba(0,0,0,0.5), inset -20px -30px 60px rgba(0,0,0,0.7), inset 0 0 60px ${G.replace(/[\d.]+\)$/,'0.2)')}, inset 10px 15px 30px rgba(255,255,255,0.07)`,
+        backdropFilter: 'blur(12px)',
+        border: `1px solid ${C}20`,
       }}>
         {/* Layer 1: Static PCB traces */}
         <svg viewBox="0 0 380 380" aria-hidden="true"
@@ -290,7 +296,16 @@ export default function AuraVoice() {
             }
           </motion.button>
         </div>
-      </div>
+
+        {/* Layer 12: 3D Glass Specular Highlight */}
+        <div style={{
+          position: 'absolute', top: '3%', left: '14%', width: '72%', height: '28%',
+          borderRadius: '50% 50% 30% 30%', pointerEvents: 'none',
+          background: 'linear-gradient(to bottom, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.02) 65%, transparent 100%)',
+          transform: 'rotate(-10deg)',
+          filter: 'blur(1.5px)',
+        }}/>
+      </motion.div>
       {/* ═════════════ END ORB ═════════════ */}
 
       {/* Status */}

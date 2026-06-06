@@ -1,5 +1,4 @@
-// src/services/langchain.js — Unified Engine (Groq + OpenRouter)
-// Optimized for ADHD/anxiety support and Clinical Recovery protocols.
+// src/services/langchain.js — Optimized v4.0 (OpenRouter Engine)
 
 import { ChatOpenAI } from '@langchain/openai';
 import { z } from 'zod';
@@ -13,6 +12,7 @@ const __dirname = path.dirname(__filename);
 
 /* ── Schemas (ADHD & Clinical Recovery) ────────────────────────────────── */
 
+/* ── Schemas ────────────────────────────── */
 const MicroQuestSchema = z.object({
   microquests: z.array(z.object({
     id:               z.number().int().min(1),
@@ -35,45 +35,35 @@ const InitiationCoachSchema = z.object({
 });
 
 const GuardianBriefSchema = z.object({
-  subject:           z.string().max(110),
-  analogy:           z.string().max(280),
-  vocal_analysis:    z.string().max(180),
-  observed_pattern:  z.string().max(380),
-  aura_action_taken: z.string().max(220),
-  parent_action:     z.string().max(280),
-  risk_level:        z.enum(['watch', 'pre-burnout', 'acute-distress']),
+  subject:           z.string().max(110).describe('WhatsApp/SMS subject line with risk emoji.'),
+  executive_summary: z.string().describe('Clinically profound high-level overview of the session state.'),
+  intake_correlations: z.string().describe('Specific synthesis of patient intake and guardian observational intake.'),
+  telemetry_correlations: z.string().describe('Specific cross-stream correlations across intake, games, acoustic arousal, worries, and task events.'),
+  somatic_biological_markers: z.string().describe('Analysis of vocal arousal, heart rate variability (if available), and biological stress signals.'),
+  cognitive_rigidity_focus: z.string().describe('Deep analysis of game latency, accuracy, and executive function markers (e.g. spatial sorting errors).'),
+  actionable_protocol: z.string().describe('Clear, step-by-step clinical protocol for the guardian including specific dialogue scripts.'),
+  guardian_protocol: z.string().describe('Guardian-facing next actions grounded in the patient and guardian intake correlation.'),
+  patient_strengths: z.string().describe('Protective factors and strengths inferred from telemetry without exaggeration.'),
+  activity_analysis: z.string().describe('Detailed activity diagnostics: For each attempted activity (even 1s or 1h), state the duration, success rate, and a detailed neuroscience reason why they might have succeeded, failed, or abandoned it.'),
+  analogy:           z.string().max(300).describe('ONE powerful non-clinical metaphor grounded in data.'),
+  risk_level:        z.enum(['watch', 'pre-burnout', 'acute-distress']).describe('Clinical risk triage.'),
 });
 
-const RecoveryProtocolSchema = z.object({
-  diagnosis_baseline: z.string().describe('The primary neuro-behavioral state identified'),
-  neuro_diet_plan: z.array(z.string()).describe('Precise nutritional interventions'),
-  somatic_exercise_plan: z.string().describe('Prescribed physical activity'),
-  confidence_anchor: z.string().describe('Psychologically grounding statement'),
-  medical_disclaimer: z.string().describe('Required safety disclaimer'),
-});
-
-/* ── Model Factory (Groq-First with OpenRouter Bulletproof Headers) ─────── */
-
+/* ── OpenRouter client factory ───────────────────────────────────────────── */
 const makeModel = (schema, name, temp = 0.38) => {
-  const apiKey = process.env.GROQ_API_KEY || process.env.OPENROUTER_API_KEY;
-  if (!apiKey) {
-    console.warn('[LangChain] API_KEY is missing — checking fallbacks.');
-    return null;
-  }
-
-  try {
-    const isGroq = !!process.env.GROQ_API_KEY;
-    const llm = new ChatOpenAI({
-      modelName: isGroq ? (process.env.GROQ_MODEL || 'llama-3.1-8b-instant') : (process.env.OPENROUTER_MODEL || 'openai/gpt-4o-mini'),
-      temperature: temp,
-      apiKey: apiKey,
-      configuration: {
-        baseURL: isGroq ? 'https://api.groq.com/openai/v1' : 'https://openrouter.ai/api/v1',
-        defaultHeaders: {
-          'Authorization': `Bearer ${apiKey}`,
-          'HTTP-Referer': 'http://localhost:5173',
-          'X-Title': 'AuraOS',
-        }
+  const apiKey = process.env.OPENROUTER_API_KEY; 
+  if (!apiKey) throw new Error('API_KEY is not set.');
+  
+  const llm = new ChatOpenAI({
+    modelName: process.env.OPENROUTER_MODEL || 'openai/gpt-4o-mini',
+    temperature: temp,
+    apiKey: apiKey,
+    configuration: {
+      baseURL: 'https://openrouter.ai/api/v1',
+      defaultHeaders: {
+        'Authorization': `Bearer ${apiKey}`,
+        'HTTP-Referer': 'http://localhost:5173',
+        'X-Title': 'AuraOS',
       }
     });
     return llm.withStructuredOutput(schema, { name, strict: true });
@@ -106,73 +96,138 @@ const STANDARD_SHATTER_PROMPT = `You are an ADHD executive function coach embedd
 The user is experiencing task paralysis. Your ONLY job: atomize their EXACT task into the SMALLEST possible steps.
 
 ABSOLUTE RULES — VIOLATION = FAILURE:
-1. NEVER generate coping mechanisms, therapy advice, breathing exercises, or mindfulness tips.
-2. ONLY output concrete, physical steps to complete the user's SPECIFIC task.
-3. Start EVERY action with a strong imperative verb (Open, Type, Click, Write, Run, Create).
-4. Tips must sound human and warm, ≤18 words. Avoid self-care fluff.`;
+1. NEVER generate coping mechanisms, therapy advice, breathing exercises, mindfulness tips, or emotional support.
+2. NEVER suggest "take a break", "drink water", "go for a walk", or any self-care step.
+3. ONLY output concrete, physical steps to complete the user's SPECIFIC task.
+4. Step 1 MUST reference the user's actual task noun (e.g. if task = "build backend", step 1 = "Open your code editor and create a new folder called 'backend'").
+5. Each step = ONE single physical action completable in ~2 minutes.
+6. Start EVERY action with a strong imperative verb (Open, Type, Click, Write, Run, Create, Navigate, Copy, Paste).
+7. Tips must sound human and warm, ≤18 words. Tips should be about the TASK, not about feelings.
+8. If the task is vague, make reasonable assumptions and be specific anyway.`;
 
-const INITIATION_COACH_PROMPT = `You are the Aura Initiation Coach — a neuro-inclusive AI for ADHD and anxiety.
-Acknowledge blocker with empathy, confirm environment change, then provide microquests.
-Step 1 MUST be cyan (easiest). Microquests = pure task execution.`;
+const INITIATION_COACH_PROMPT = `You are the Aura Initiation Coach — a Principal Engineer and neuro-inclusive AI designed for clinical task unblocking.
+The user selected a specific blocker. You MUST tailor the coaching and the task breakdown strictly to this blocker.
 
-const GUARDIAN_BRIEF_PROMPT = `You are the AuraOS Clinical Intelligence Layer writing a Guardian Triage Brief.
-Tone: Clinical authority + genuine human warmth. Reference specific metrics from telemetry.
-risk_level: watch | pre-burnout | acute-distress.`;
+ABSOLUTE RULES — VIOLATION = FAILURE:
+1. Every microquest MUST be a concrete physical action to complete the user's ACTUAL task. No therapy advice.
+2. IF BLOCKER IS "too_noisy" (Sensory Overload):
+   - Coach Message: Acknowledge external noise/distraction. Inform them acoustic masking (Brown Noise) is active.
+   - Microquests: Step 1 MUST focus on environment control (e.g., "Put on headphones", "Close your door"). Step 2 onwards must break down the task normally.
+3. IF BLOCKER IS "brain_fog" (Cognitive Fatigue):
+   - Coach Message: Acknowledge internal energy depletion. Inform them optical strain reduction (Dark Mode) is active.
+   - Microquests: The breakdown must be ATOMIZED into ridiculously small, zero-cognitive-load steps. E.g., "Open the file", "Write one single sentence". No heavy planning allowed.
+4. The coach_message is the ONLY place for empathy. Microquests = pure task execution.
 
-const RECOVERY_AGENT_PROMPT = `You are the AuraOS Clinical Recovery Agent. Goal: prescribe neuro-chemical Diet and Exercise based on clinical telemetry.
-Rules:
-1. ADHD/Freeze -> Dopamine-boosting.
-2. Anxiety/Arousal -> GABA-boosting / Cortisol-lowering.
-3. Depression -> Serotonin-boosting.
-Clinical Evidence:\n${loadClinicalKnowledge()}`;
+ENVIRONMENT STRATEGY:
+• brown_noise → noisy/distracted (Sensory Overload)
+• deep_focus_dark → brain fog/fatigue (Cognitive Fatigue)
+• meditation_first → acute overwhelm.
+• none → mild friction.
 
-/* ── Local Fallbacks ───────────────────────────────────────────────────────── */
+MICROQUESTS: Step 1 MUST be cyan (easiest). Be hyper-specific to the user's task. Start with imperative verbs.`;
 
-const localFallbackBreakdown = (task) => [
-  { id: 1, action: `Open the app needed for: ${task.slice(0, 30)}`, tip: 'Starting is the hardest part.', duration_minutes: 1 },
-  { id: 2, action: `Focus on the very next physical step`, tip: 'Keep it tiny.', duration_minutes: 2 },
-];
+const GUARDIAN_BRIEF_PROMPT = `You are a Senior Medical Doctor in Neuroscience and Behavioral Health. You are writing a highly professional, clinical "Deep Diagnosis" session report for AuraOS.
 
-const localFallbackCoach = (task, blocker) => ({
-  coach_message: `${blocker || 'Overwhelm'} is a signal to slow down. Let me set up your workspace.`,
-  environment_strategy: 'brown_noise',
-  microquests: localFallbackBreakdown(task),
-});
+MISSION:
+Transform raw intake + guardian observations + live telemetry into profound clinical neuroscience insights. Do not just regurgitate data. Perform a deep, dynamic synthesis.
+Example: Instead of "User got 4 errors in Color Sort," say "High error rates in spatial sorting combined with elevated vocal arousal suggest acute executive dysfunction and impulse control fatigue."
+Required example style: "The guardian noted frequent night-time isolation, which correlates with the patient's severe cognitive rigidity scores in Perception Probe and elevated baseline stress intake."
 
-/* ── EXPORTS ───────────────────────────────────────────────────────────────── */
+STRUCTURED OUTPUT SECTIONS:
+1. executive_summary: A synthesis of the patient's current neuropsychological state. Is this a state-based freeze or a trait-based burnout?
+2. intake_correlations: Directly connect patient self-report with guardian observational MCQs. Use at least one "guardian noted X, patient reported Y" sentence when data exists.
+3. telemetry_correlations: Directly connect intake + guardian observations to game latency/accuracy, worry density, acoustic arousal, and stress spikes.
+4. somatic_biological_markers: Interpret vocal arousal (1-10) and acoustic stress markers. How does this correlate with the stated blocker?
+5. cognitive_rigidity_focus: Analyze game performance (latency, accuracy). High latency in Perception Probe suggests cognitive inflexibility. Rhythm Sync variance suggests timing dysregulation. Spark Canvas hesitation suggests inhibition.
+6. activity_analysis: Detailed diagnostics of EVERY activity the patient tried. State exactly how long they spent (e.g., 45 seconds, 1 hour), whether they completed/answered correctly, and provide a strict neuroscience/clinical reason why they succeeded, failed, or faced a blocker linked to that specific activity performance.
+7. actionable_protocol / guardian_protocol: A precise behavioral protocol. Include exactly ONE direct quote for the guardian to say.
+8. patient_strengths: Identify protective factors from completed tasks, regulation attempts, successful game signals, or help-seeking.
+9. analogy: A data-grounded metaphor (e.g. "a CPU thermal throttling due to background task density").
+
+STRICT DATA-GROUNDED RULES:
+1. Reference SPECIFIC metrics: "Vocal arousal of 8/10", "1200ms latency", "40% accuracy".
+2. Link somatic data to cognitive data. (e.g. "Elevated arousal correlated with increased reaction times across therapeutic games").
+3. Never write static boilerplate. Every paragraph must cite at least one provided datapoint or explicitly state a missing datapoint.
+4. Do not diagnose ADHD, panic disorder, depression, or PTSD. Use "consistent with", "suggests", or "may reflect".
+5. TONE: High-level clinical authority + diagnostic precision.
+
+STRICT RISK CLASSIFICATION:
+- watch: Mild stress, resilient recovery.
+- pre-burnout: Chronic sympathetic activation, declining executive performance.
+- acute-distress: Immediate neurological shutdown / crisis state detected.`;
 
 export const breakdownTask = async (task) => {
   const model = makeModel(MicroQuestSchema, 'generate_microquests');
-  if (!model) return localFallbackBreakdown(task);
-  try {
-    const result = await model.invoke([
-      new SystemMessage(STANDARD_SHATTER_PROMPT),
-      new HumanMessage(`Break this task into 2-minute micro-steps: "${task}"`),
-    ]);
-    return result.microquests;
-  } catch (err) {
-    return localFallbackBreakdown(task);
-  }
+  console.log(`[LangChain-OpenRouter] Standard breakdown...`);
+  const result = await model.invoke([
+    new SystemMessage(STANDARD_SHATTER_PROMPT),
+    new HumanMessage(`Break this task into micro-steps: "\${task}"`),
+  ]);
+  return result.microquests;
 };
 
 export const coachBreakdown = async (task, blocker) => {
   const model = makeModel(InitiationCoachSchema, 'initiation_coach');
-  if (!model) return localFallbackCoach(task, blocker);
-  try {
-    return await model.invoke([
-      new SystemMessage(INITIATION_COACH_PROMPT),
-      new HumanMessage(`Task: "${task}"\nBlocker: "${blocker || 'not specified'}"`),
-    ]);
-  } catch (err) {
-    return localFallbackCoach(task, blocker);
-  }
+  console.log(`[LangChain-OpenRouter] Coach breakdown...`);
+  return await model.invoke([
+    new SystemMessage(INITIATION_COACH_PROMPT),
+    new HumanMessage(`Task: "\${task}"\nBlocker: "\${blocker || 'overwhelm'}"`),
+  ]);
 };
 
 export const generateGuardianBrief = async (data) => {
   const model = makeModel(GuardianBriefSchema, 'guardian_brief', 0.42);
-  if (!model) return { subject: "[WATCH] Stress Alert", observed_pattern: "Automatic monitoring flagged moderate stress." };
-  
-  // Dynamic context block construction (simplified for brevity but including key data points)
+
+  // ── Build rich telemetry context block ───────────────────────────────
+  const safe = (v, fallback = 'N/A') => (v !== undefined && v !== null && v !== '') ? v : fallback;
+  const arousalLabel = Number(data.vocalArousal) >= 8 ? 'HIGH' : Number(data.vocalArousal) >= 6 ? 'ELEVATED' : Number(data.vocalArousal) >= 4 ? 'MODERATE' : 'LOW';
+
+  // Baseline profile
+  const bp = data.baselineProfile || {};
+  const bpLines = Object.keys(bp).length
+    ? Object.entries(bp).map(([k, v]) => `  \${k}: \${v}`).join('\n')
+    : '  Not completed.';
+
+  // Worry blocks
+  const worries = Array.isArray(data.worryBlocks) && data.worryBlocks.length
+    ? data.worryBlocks.slice(0, 8).map(w => `  - "\${w.text}" (weight: \${w.weight}/10, \${w.status})`).join('\n')
+    : '  None extracted this session.';
+
+  // Probe sessions (cognitive flexibility)
+  const probes = Array.isArray(data.probeSessions) && data.probeSessions.length
+    ? data.probeSessions.map(p => `  - Image: \${p.imageId}, First seen: \${p.firstSeen}, Latency: \${p.latencyMs}ms, Switched: \${p.canSwitchPerspective}`).join('\n')
+    : '  Not assessed this session.';
+
+  // Quest telemetry (shatter exertion / timeline)
+  const quests = Array.isArray(data.questTelemetry) && data.questTelemetry.length
+    ? data.questTelemetry.map(q => `  - \${q.action || q.questId || 'Task'}: \${q.durationMs || (q.duration_minutes ? q.duration_minutes * 60000 : '?')}ms, completed: \${q.completed}`).join('\n')
+    : '  No micro-quest data.';
+
+  // Game sessions
+  const games = Array.isArray(data.gameSessions) && data.gameSessions.length
+    ? data.gameSessions.map(g => `  - \${g.gameName || g.gameId}: \${g.durationSeconds}s, score \${g.score}, accuracy \${g.accuracy}%, reaction \${g.avgReactionMs}ms. \${g.predictedEffects?.clinicalNote || ''}`).join('\n')
+    : '  No therapeutic games played.';
+
+  const fmtAnswers = (intake, label) => {
+    const scores = intake?.derivedScores ? Object.entries(intake.derivedScores).map(([k, v]) => `\${k}: \${v}/10`).join(', ') : 'no derived scores';
+    const answers = Array.isArray(intake?.answers) && intake.answers.length
+      ? intake.answers.map(a => `  - \${a.label || a.id}: \${a.value}/4`).join('\n')
+      : '  Not completed.';
+    return `\${label} derived scores: \${scores}\n\${answers}`;
+  };
+
+  const vocalEvents = Array.isArray(data.vocalStressEvents) && data.vocalStressEvents.length
+    ? data.vocalStressEvents.map(e => `  - \${e.arousalScore || '?'} /10 \${e.emotion || ''} during \${e.taskContext || 'unknown context'}`).join('\n')
+    : '  No recent vocal events.';
+
+  const spikes = Array.isArray(data.stressSpikes) && data.stressSpikes.length
+    ? data.stressSpikes.map(s => `  - \${s.vocalArousal || '?'} /10 trigger "\${s.trigger || 'unknown'}", blocker "\${s.blocker || 'unknown'}"`).join('\n')
+    : '  No recent stress spikes.';
+
+  const guardianAlerts = Array.isArray(data.guardianAlerts) && data.guardianAlerts.length
+    ? data.guardianAlerts.map(a => `  - \${a.riskLevel || 'watch'} via \${a.channel || 'unknown'}: \${a.triggerReason || 'alert event'}`).join('\n')
+    : '  No guardian alerts in range.';
+
   const contextBlock = `
 PATIENT: ${data.userName}
 TASK: "${data.taskSummary}"
@@ -181,32 +236,51 @@ VOCAL AROUSAL: ${data.vocalArousal}/10
 EMOTION: ${data.emotion}
   `.trim();
 
+PATIENT: \${safe(data.userName)}
+CURRENT TASK: "\${safe(data.taskSummary, 'unspecified')}"
+BLOCKER: "\${safe(data.blocker, 'none stated')}"
+VOCAL AROUSAL: \${safe(data.vocalArousal)}/10 — \${arousalLabel}
+DETECTED EMOTION: \${safe(data.emotion)}
+LAST KNOWN ACTIVITY: \${safe(data.lastKnownActivity, 'Unknown')}
+BASELINE AROUSAL (from intake): \${safe(data.baselineArousalScore)}
+
+ONBOARDING BASELINE PROFILE:
+\${bpLines}
+
+PATIENT 10-QUESTION INTAKE:
+\${fmtAnswers(data.patientIntake, 'Patient intake')}
+
+GUARDIAN 5-QUESTION OBSERVATIONAL INTAKE:
+\${fmtAnswers(data.guardianIntake, 'Guardian intake')}
+
+WORRY BLOCKS (Cognitive Forge):
+\${worries}
+
+COGNITIVE FLEXIBILITY (Perception Probe):
+\${probes}
+
+MICRO-QUEST EXERTION (Task Shatter):
+\${quests}
+
+THERAPEUTIC GAME SESSIONS:
+\${games}
+
+RECENT VOCAL STRESS EVENTS:
+\${vocalEvents}
+
+CRISIS / SPIKE EVENTS:
+\${spikes}
+
+GUARDIAN ALERT HISTORY:
+\${guardianAlerts}
+
+AURA INTERVENTION: \${safe(data.auraAction, 'Somatic interruption deployed.')}
+24H PATTERN: \${safe(data.recentPatterns, 'No historical pattern available.')}
+`.trim();
+
+  console.log(`[LangChain-OpenRouter] Guardian brief for: \${data.userName}`);
   return await model.invoke([
     new SystemMessage(GUARDIAN_BRIEF_PROMPT),
-    new HumanMessage(`Generate Triage Brief:\n\n${contextBlock}`),
+    new HumanMessage(`Generate the Guardian Triage Brief based ONLY on this telemetry:\n\n\${contextBlock}`),
   ]);
-};
-
-export const generateRecoveryProtocol = async (reportData) => {
-  const model = makeModel(RecoveryProtocolSchema, 'recovery_protocol', 0.4);
-  const fallback = {
-    diagnosis_baseline: "Stress Response",
-    neuro_diet_plan: ["Magnesium rich foods"],
-    somatic_exercise_plan: "Zone 2 brisk walk",
-    confidence_anchor: "You completed steps today.",
-    medical_disclaimer: "AuraOS provides neuro-supportive lifestyle suggestions, not medical prescriptions."
-  };
-  
-  if (!model) return fallback;
-
-  try {
-    const result = await model.invoke([
-      new SystemMessage(RECOVERY_AGENT_PROMPT),
-      new HumanMessage(`Generate Recovery Protocol:\n\n${JSON.stringify(reportData)}`),
-    ]);
-    if (!result.medical_disclaimer) result.medical_disclaimer = fallback.medical_disclaimer;
-    return result;
-  } catch (err) {
-    return fallback;
-  }
 };

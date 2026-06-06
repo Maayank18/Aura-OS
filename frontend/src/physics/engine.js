@@ -45,7 +45,7 @@ export const initEngine = (canvas, onBlockDestroyed) => {
   });
 
   // ── Static walls ───────────────────────────────────────────────────────────
-  const wallOpts = { isStatic: true, render: { fillStyle: 'transparent' }, label: 'wall' };
+  const wallOpts = { isStatic: true, render: { fillStyle: 'var(--theme-transparent)' }, label: 'wall' };
   World.add(world, [
     Bodies.rectangle(W / 2, H + 25, W, 50, wallOpts),  // floor (hidden, below canvas)
     Bodies.rectangle(-25,   H / 2, 50, H, wallOpts),   // left wall
@@ -60,7 +60,7 @@ export const initEngine = (canvas, onBlockDestroyed) => {
     isStatic: true,
     label: 'shelf',
     render: {
-      fillStyle: 'rgba(255,255,255,0.08)',
+      fillStyle: 'var(--theme-light-opacity)',
       strokeStyle: 'rgba(255,255,255,0.18)',
       lineWidth: 1,
     },
@@ -73,7 +73,7 @@ export const initEngine = (canvas, onBlockDestroyed) => {
     isStatic: true,
     isSensor: true,
     label: 'fireplace',
-    render: { fillStyle: 'transparent', strokeStyle: 'transparent' },
+    render: { fillStyle: 'var(--theme-transparent)', strokeStyle: 'var(--theme-transparent)' },
   });
   World.add(world, fireplace);
 
@@ -129,7 +129,7 @@ export const initEngine = (canvas, onBlockDestroyed) => {
       const text = body.worryText.toUpperCase();
       const maxWidth = body.worryWidth - 16;
 
-      ctx.fillStyle = 'rgba(255,255,255,0.95)';
+      ctx.fillStyle = 'var(--theme-bright-opacity)';
       ctx.font = '900 13px Inter, monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';

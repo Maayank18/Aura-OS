@@ -1,0 +1,301 @@
+/* ══════════════════════════════════════════════════════════════
+   AuraOS — Auth & Landing Design Layer
+   Tactile Glassmorphism: physically-indented inputs, 3D buttons,
+   bioluminescent dark neon on #020915 deep space.
+══════════════════════════════════════════════════════════════ */
+
+/* ── Landing hero orbit ── */
+@keyframes orbit1 {
+  from { transform: rotate(0deg) translateX(140px) rotate(0deg); }
+  to   { transform: rotate(360deg) translateX(140px) rotate(-360deg); }
+}
+@keyframes orbit2 {
+  from { transform: rotate(120deg) translateX(180px) rotate(-120deg); }
+  to   { transform: rotate(480deg) translateX(180px) rotate(-480deg); }
+}
+@keyframes orbit3 {
+  from { transform: rotate(240deg) translateX(220px) rotate(-240deg); }
+  to   { transform: rotate(600deg) translateX(220px) rotate(-600deg); }
+}
+@keyframes coreGlow {
+  0%,100% { box-shadow: 0 0 60px 20px rgba(0,229,255,0.25), 0 0 120px 40px rgba(124,58,237,0.15); }
+  50%     { box-shadow: 0 0 80px 28px rgba(0,229,255,0.4),  0 0 160px 60px rgba(124,58,237,0.25); }
+}
+@keyframes floatY {
+  0%,100% { transform: translateY(0px); }
+  50%     { transform: translateY(-12px); }
+}
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(32px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
+@keyframes glowPulse {
+  0%,100% { opacity: 0.6; }
+  50%     { opacity: 1; }
+}
+@keyframes particleDrift {
+  0%   { transform: translate(0,0) scale(1);   opacity: 0.8; }
+  100% { transform: translate(var(--dx),var(--dy)) scale(0); opacity: 0; }
+}
+
+/* ── Tactile Glassmorphism base ── */
+.tg-surface {
+  background: linear-gradient(
+    160deg,
+    rgba(255,255,255,0.055) 0%,
+    rgba(255,255,255,0.02)  60%,
+    rgba(0,229,255,0.03)    100%
+  );
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-top: 1px solid rgba(255,255,255,0.14);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.07) inset,
+    0 -1px 0 rgba(0,0,0,0.3) inset,
+    0 24px 64px rgba(0,0,0,0.5),
+    0 8px  24px rgba(0,0,0,0.3);
+}
+
+/* ── Tactile indented input ── */
+.tg-input {
+  width: 100%;
+  padding: 14px 18px;
+  font-family: var(--font);
+  font-size: 15px;
+  color: var(--text-1);
+  outline: none;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.06);
+  background: linear-gradient(
+    160deg,
+    rgba(0,0,0,0.35) 0%,
+    rgba(0,0,0,0.2)  100%
+  );
+  box-shadow:
+    0 2px 4px rgba(0,0,0,0.4) inset,
+    0 1px 0 rgba(255,255,255,0.06);
+  transition: border-color 0.25s, box-shadow 0.25s;
+}
+.tg-input::placeholder { color: rgba(139,175,194,0.55); }
+.tg-input:focus {
+  border-color: rgba(124,58,237,0.55);
+  box-shadow:
+    0 2px 4px rgba(0,0,0,0.4) inset,
+    0 0 0 3px rgba(124,58,237,0.2),
+    0 0 20px rgba(124,58,237,0.15);
+}
+
+/* ── Tactile 3D primary button ── */
+.tg-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 15px 28px;
+  border-radius: 14px;
+  font-family: var(--font);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #fff;
+  background: linear-gradient(165deg, #9b59f5 0%, #7c3aed 45%, #5b21b6 100%);
+  border: 1px solid rgba(155,89,245,0.8);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.18) inset,
+    0 -2px 0 rgba(0,0,0,0.35) inset,
+    0 6px 24px rgba(124,58,237,0.5),
+    0 2px 4px rgba(0,0,0,0.3);
+  cursor: pointer;
+  transition: transform 0.12s, box-shadow 0.12s, filter 0.12s;
+  position: relative;
+  overflow: hidden;
+}
+.tg-btn-primary::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(255,255,255,0.1) 0%, transparent 50%);
+  border-radius: inherit;
+  pointer-events: none;
+}
+.tg-btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.18) inset,
+    0 -2px 0 rgba(0,0,0,0.35) inset,
+    0 12px 36px rgba(124,58,237,0.65),
+    0 4px 8px rgba(0,0,0,0.3);
+  filter: brightness(1.08);
+}
+.tg-btn-primary:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.1) inset,
+    0 -1px 0 rgba(0,0,0,0.35) inset,
+    0 4px 16px rgba(124,58,237,0.4);
+}
+.tg-btn-primary:disabled { opacity: 0.38; cursor: not-allowed; }
+
+/* ── Tactile secondary button ── */
+.tg-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 14px 28px;
+  border-radius: 14px;
+  font-family: var(--font);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-1);
+  background: linear-gradient(
+    160deg,
+    rgba(255,255,255,0.07) 0%,
+    rgba(255,255,255,0.02) 100%
+  );
+  border: 1px solid rgba(255,255,255,0.1);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.07) inset,
+    0 -1px 0 rgba(0,0,0,0.2) inset,
+    0 4px 16px rgba(0,0,0,0.3);
+  cursor: pointer;
+  transition: transform 0.12s, box-shadow 0.12s, border-color 0.2s;
+}
+.tg-btn-secondary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(255,255,255,0.18);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.1) inset,
+    0 -1px 0 rgba(0,0,0,0.2) inset,
+    0 8px 24px rgba(0,0,0,0.4);
+}
+.tg-btn-secondary:active:not(:disabled) { transform: translateY(0px); }
+.tg-btn-secondary:disabled { opacity: 0.38; cursor: not-allowed; }
+
+/* ── Answer option card ── */
+.tg-answer {
+  width: 100%;
+  text-align: left;
+  padding: 16px 20px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.06);
+  background: rgba(0,0,0,0.2);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25) inset, 0 1px 0 rgba(255,255,255,0.05);
+  color: var(--text-2);
+  font-family: var(--font);
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.tg-answer:hover {
+  background: rgba(124,58,237,0.08);
+  border-color: rgba(124,58,237,0.25);
+  color: var(--text-1);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2) inset, 0 0 20px rgba(124,58,237,0.1);
+}
+.tg-answer-selected {
+  background: rgba(124,58,237,0.15);
+  border-color: rgba(124,58,237,0.6);
+  color: #c4b5fd;
+  box-shadow:
+    0 2px 6px rgba(0,0,0,0.25) inset,
+    0 0 24px rgba(124,58,237,0.2),
+    0 0 0 1px rgba(124,58,237,0.3);
+}
+
+/* ── Shimmer text ── */
+.text-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0.5) 0%,
+    rgba(255,255,255,1)   20%,
+    rgba(196,181,253,1)   40%,
+    rgba(0,229,255,1)     60%,
+    rgba(255,255,255,1)   80%,
+    rgba(255,255,255,0.5) 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer 3s linear infinite;
+}
+
+/* ── Progress dots ── */
+.tg-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.12);
+  transition: all 0.3s;
+}
+.tg-dot-active {
+  width: 24px;
+  background: linear-gradient(90deg, #7c3aed, #00e5ff);
+  border-radius: 4px;
+}
+
+/* ── Risk badge colors ── */
+.risk-watch       { color: #22c55e;  background: rgba(34,197,94,0.1);   border-color: rgba(34,197,94,0.3); }
+.risk-pre-burnout { color: #f59e0b;  background: rgba(245,158,11,0.1);  border-color: rgba(245,158,11,0.3); }
+.risk-acute       { color: #ef4444;  background: rgba(239,68,68,0.1);   border-color: rgba(239,68,68,0.3); }
+
+/* ── Guardian layout nav ── */
+.guardian-nav {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 28px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  background: rgba(2,9,21,0.92);
+  backdrop-filter: blur(28px);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.guardian-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(139,175,194,0.7);
+  transition: all 0.2s;
+}
+.guardian-nav-link:hover { color: var(--text-1); background: rgba(255,255,255,0.04); }
+.guardian-nav-link.active {
+  color: #c4b5fd;
+  background: rgba(124,58,237,0.12);
+  border: 1px solid rgba(124,58,237,0.2);
+}
+
+/* ── Custom recharts tooltip ── */
+.custom-tooltip {
+  background: rgba(6,15,30,0.95);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-family: var(--font);
+  font-size: 12px;
+  color: var(--text-1);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+
+/* ── Landing scroll particle canvas ── */
+.landing-particle {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: particleDrift 4s ease-out infinite;
+}

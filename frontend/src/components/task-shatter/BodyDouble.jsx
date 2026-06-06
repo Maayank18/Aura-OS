@@ -6,15 +6,15 @@ import { X } from 'lucide-react';
 
 const AvatarSVG = ({ size = 100 }) => (
   <svg width={size} height={size} viewBox="0 0 100 100" fill="none">
-    <circle cx="50" cy="36" r="22" fill="#7c3aed" opacity="0.92"/>
+    <circle cx="50" cy="36" r="22" fill="var(--purple)" opacity="0.92"/>
     <circle cx="43" cy="33" r="3.5" fill="white"/>
     <circle cx="57" cy="33" r="3.5" fill="white"/>
     <circle cx="44.5" cy="34.2" r="2" fill="#1a0a2e"/>
     <circle cx="58.5" cy="34.2" r="2" fill="#1a0a2e"/>
     <path d="M44 42 Q50 46 56 42" stroke="white" strokeWidth="1.8" strokeLinecap="round" fill="none"/>
-    <rect x="32" y="60" width="36" height="28" rx="12" fill="#7c3aed" opacity="0.75"/>
-    <rect x="14" y="62" width="18" height="8" rx="4" fill="#7c3aed" opacity="0.6"/>
-    <rect x="68" y="62" width="18" height="8" rx="4" fill="#7c3aed" opacity="0.6"/>
+    <rect x="32" y="60" width="36" height="28" rx="12" fill="var(--purple)" opacity="0.75"/>
+    <rect x="14" y="62" width="18" height="8" rx="4" fill="var(--purple)" opacity="0.6"/>
+    <rect x="68" y="62" width="18" height="8" rx="4" fill="var(--purple)" opacity="0.6"/>
     <path d="M40 27 Q43 24 46 27" stroke="white" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
     <path d="M54 27 Q57 24 60 27" stroke="white" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
     {/* Sparkle decorations */}
@@ -33,7 +33,7 @@ export default function BodyDouble({ taskAction, onDismiss, isFullscreen = false
         style={{
           position:'fixed',inset:0,zIndex:9999,
           display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
-          background:'rgba(2,9,21,0.96)',backdropFilter:'blur(24px)',
+          background:'var(--bg-glass-deep)',backdropFilter:'blur(24px)',
           cursor:'pointer',gap:28,
         }}
       >
@@ -47,8 +47,8 @@ export default function BodyDouble({ taskAction, onDismiss, isFullscreen = false
           {taskAction && (
             <div style={{
               padding:'14px 20px',marginBottom:16,fontSize:15,
-              background:'rgba(124,58,237,0.15)',
-              border:'1px solid rgba(196,181,253,0.3)',
+              background:'var(--bg-glass)',
+              border:'1px solid var(--border)',
               borderRadius:14,color:'var(--purple-soft)',lineHeight:1.5,
             }}>
               {taskAction}
@@ -69,8 +69,8 @@ export default function BodyDouble({ taskAction, onDismiss, isFullscreen = false
       initial={{opacity:0,scale:0.8,y:20}} animate={{opacity:1,scale:1,y:0}} exit={{opacity:0,scale:0.8,y:20}}
       style={{
         position:'fixed',bottom:24,right:24,zIndex:500,
-        background:'rgba(6,15,30,0.88)',backdropFilter:'blur(20px)',
-        border:'1px solid rgba(124,58,237,0.35)',
+        background:'var(--bg-glass-deep)',backdropFilter:'blur(20px)',
+        border:'1px solid var(--border)',
         borderRadius:20,padding:'12px 16px',
         display:'flex',alignItems:'center',gap:10,
         boxShadow:'0 8px 32px rgba(0,0,0,0.45),0 0 0 1px rgba(196,181,253,0.1)',

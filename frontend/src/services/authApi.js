@@ -1,0 +1,99 @@
+import useStore from '../store/useStore.js';
+
+const BASE = '/api/auth';
+const TOKEN_KEY = 'aura-auth-token';
+const ACCOUNT_KEY = 'aura-auth-account';
+const API_TIMEOUT = 12_000;
+
+export const getAuthToken = () => {
+  const stateToken = useStore.getState().auth?.token;
+  return stateToken || localStorage.getItem(TOKEN_KEY) || '';
+};
+
+export const getStoredAccount = () => {
+  const stateAccount = useStore.getState().auth?.account;
+  if (stateAccount) return stateAccount;
+  try {
+    return JSON.parse(localStorage.getItem(ACCOUNT_KEY) || 'null');
+  } catch {
+    return null;
+  }
+};
+
+export const setAuthSession = ({ token, account }) => {
+  const isStateless = account?.role === 'guardian' || account?.role === 'committee' || account?.accountType === 'GUARDIAN' || account?.accountType === 'COMMITTEE';
+  
+  useStore.getState().setAuth({ token, account });
+
+  if (!isStateless) {
+    if (token) localStorage.setItem(TOKEN_KEY, token);
+    if (account) localStorage.setItem(ACCOUNT_KEY, JSON.stringify(account));
+  }
+};
+
+export const clearAuthSession = () => {
+  useStore.getState().setAuth({ token: null, account: null });
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(ACCOUNT_KEY);
+};
+
+const req = async (method, path, body, timeoutMs = API_TIMEOUT) => {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  const token = getAuthToken();
+
+  try {
+    const res = await fetch(`${BASE}${path}`, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      signal: ctrl.signal,
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+
+    // Handle empty responses (e.g. when backend is down and proxy returns nothing)
+    const text = await res.text();
+    if (!text) {
+      throw new Error(
+        `Server returned an empty response (${res.status}). Is the backend running?`
+      );
+    }
+
+    let json;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      throw new Error(
+        `Server returned non-JSON response (${res.status}). The backend may be down or misconfigured.`
+      );
+    }
+
+    if (!res.ok || !json.success) throw new Error(json.error || `Request failed (${res.status})`);
+    if (json.token || json.account) setAuthSession(json);
+    return json;
+  } catch (err) {
+    if (err.name === 'AbortError') throw new Error('Request timed out.');
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+export const authApi = {
+  register: (body) => req('POST', '/register', body),
+  patientRegister: (body) => req('POST', '/patient/register', body),
+  guardianRegister: (body) => req('POST', '/guardian/register', body),
+  login: (body) => req('POST', '/login', body),
+  me: () => req('GET', '/me'),
+  patientIntake: (answers, privacyConsent) => req('POST', '/patient/intake', { answers, privacyConsent }),
+  generateInviteCode: () => req('POST', '/patient/invite-code'),
+  linkPatient: (inviteCode) => req('POST', '/guardian/link-patient', { inviteCode }),
+  guardianIntake: (patientId, answers) => req('POST', `/guardian/patient/${patientId}/intake`, { answers }),
+  guardianPatients: () => req('GET', '/guardian/patients'),
+  moodLog: (payload) => req('POST', '/patient/mood-log', payload),
+  getMoodLogs: (limit = 7) => req('GET', `/patient/mood-logs?limit=${limit}`),
+  logout: clearAuthSession,
+};
+

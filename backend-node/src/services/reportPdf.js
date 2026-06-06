@@ -1,175 +1,316 @@
-// src/services/reportPdf.js — v4.1 (Unified React-PDF Engine)
-// Professionally styled reports with embedded Clinical Recovery Protocols.
-
-import React from 'react';
-import { renderToBuffer, Document, Page, View, Text, StyleSheet, Font } from '@react-pdf/renderer';
-
-// ── Register Google Font (Inter) ──────────────────────────────────────────────
+import React from "react";
+import { renderToBuffer, Document, Page, View, Text, StyleSheet, Font } from "@react-pdf/renderer";
 Font.register({
-  family: 'Inter',
+  family: "Inter",
   fonts: [
-    { src: 'https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuLyfMZg.ttf', fontWeight: 400 },
-    { src: 'https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuGKYMZg.ttf', fontWeight: 600 },
-    { src: 'https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuFuYMZg.ttf', fontWeight: 700 }
+    { src: "https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuLyfMZg.ttf", fontWeight: 400 },
+    { src: "https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuGKYMZg.ttf", fontWeight: 600 },
+    { src: "https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuFuYMZg.ttf", fontWeight: 700 }
   ]
 });
-
-// ── Styles ───────────────────────────────────────────────────────────────────
 const colors = {
-  dark: '#0f172a',
-  text: '#1e293b',
-  muted: '#64748b',
-  border: '#e2e8f0',
-  accent: '#3b82f6',
-  riskWatch: '#16a34a',
-  riskPre: '#ea580c',
-  riskAcute: '#dc2626',
-  bgLight: '#f8fafc',
-  white: '#ffffff',
-  recovery: '#eff6ff'
+  primary: "#0f172a",
+  secondary: "#334155",
+  accent: "#3b82f6",
+  white: "#ffffff",
+  bg: "#f8fafc",
+  border: "#e2e8f0",
+  text: "#1e293b",
+  muted: "#64748b",
+  risk: {
+    watch: "#16a34a",
+    "pre-burnout": "#ea580c",
+    "acute-distress": "#dc2626"
+  }
 };
 
 const styles = StyleSheet.create({
-  page: { padding: 40, fontFamily: 'Inter', fontSize: 10, color: colors.text, lineHeight: 1.5 },
-  headerBar: { backgroundColor: colors.dark, padding: 16, marginBottom: 16, borderRadius: 4, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  headerTitle: { color: colors.white, fontSize: 16, fontWeight: 700 },
-  headerSub: { color: '#94a3b8', fontSize: 8, marginTop: 2 },
-  riskBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 3, alignSelf: 'center' },
-  riskBadgeText: { color: colors.white, fontSize: 9, fontWeight: 700 },
-  sectionTitle: { fontSize: 12, fontWeight: 700, color: colors.dark, marginBottom: 4, marginTop: 12 },
-  sectionBody: { fontSize: 10, color: colors.text, lineHeight: 1.6 },
-  divider: { borderBottomWidth: 0.5, borderBottomColor: colors.border, marginVertical: 8 },
-  row: { flexDirection: 'row', marginBottom: 2 },
-  label: { fontWeight: 600, width: 140, color: colors.muted, fontSize: 9 },
-  value: { flex: 1, fontSize: 9.5 },
-  bulletItem: { flexDirection: 'row', marginLeft: 8, marginBottom: 2 },
-  bulletDot: { width: 12, fontSize: 9 },
-  bulletText: { flex: 1, fontSize: 9.5 },
-  card: { backgroundColor: colors.bgLight, borderRadius: 4, padding: 8, marginBottom: 6, borderWidth: 0.5, borderColor: colors.border },
-  recoveryBox: { backgroundColor: colors.recovery, borderRadius: 4, padding: 12, marginTop: 8, borderWidth: 0.5, borderColor: '#bfdbfe' },
-  recoveryTitle: { fontSize: 11, fontWeight: 700, color: '#1e40af', marginBottom: 6 },
-  recoverySub: { fontSize: 9, fontWeight: 600, color: '#1d4ed8', marginTop: 4 },
-  footer: { position: 'absolute', bottom: 24, left: 40, right: 40, fontSize: 7, color: colors.muted, textAlign: 'center' }
+  page: {
+    padding: 50,
+    fontFamily: "Inter",
+    fontSize: 10,
+    color: colors.text,
+    backgroundColor: colors.white
+  },
+  header: {
+    marginBottom: 30,
+    borderBottom: 2,
+    borderBottomColor: colors.primary,
+    paddingBottom: 10,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-end"
+  },
+  headerLeft: {
+    flexDirection: "column"
+  },
+  brand: {
+    fontSize: 24,
+    fontWeight: 700,
+    color: colors.primary,
+    letterSpacing: -1
+  },
+  reportType: {
+    fontSize: 10,
+    fontWeight: 600,
+    color: colors.accent,
+    textTransform: "uppercase",
+    marginTop: 4
+  },
+  metaInfo: {
+    fontSize: 8,
+    color: colors.muted,
+    textAlign: "right"
+  },
+  riskSection: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 20,
+    padding: 15,
+    borderRadius: 8
+  },
+  riskLabel: {
+    fontSize: 12,
+    fontWeight: 700,
+    color: colors.white,
+    textTransform: "uppercase",
+    paddingTop: 4,
+    paddingBottom: 4,
+    paddingLeft: 12,
+    paddingRight: 12,
+    borderRadius: 4
+  },
+  riskDesc: {
+    fontSize: 10,
+    fontWeight: 500,
+    color: colors.secondary,
+    flex: 1
+  },
+  grid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 20,
+    marginBottom: 25
+  },
+  gridItem: {
+    width: "47%",
+    padding: 12,
+    backgroundColor: colors.bg,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: colors.border
+  },
+  gridLabel: {
+    fontSize: 8,
+    fontWeight: 700,
+    color: colors.muted,
+    textTransform: "uppercase",
+    marginBottom: 4
+  },
+  gridValue: {
+    fontSize: 11,
+    fontWeight: 600,
+    color: colors.primary
+  },
+  section: {
+    marginBottom: 25
+  },
+  sectionHeader: {
+    fontSize: 13,
+    fontWeight: 700,
+    color: colors.primary,
+    borderLeft: 4,
+    borderLeftColor: colors.accent,
+    paddingLeft: 10,
+    marginBottom: 12,
+    textTransform: "uppercase"
+  },
+  diagnosisCard: {
+    padding: 15,
+    backgroundColor: "#f1f5f9",
+    borderRadius: 8,
+    marginBottom: 10
+  },
+  diagnosisTitle: {
+    fontSize: 9,
+    fontWeight: 700,
+    color: colors.accent,
+    marginBottom: 6,
+    textTransform: "uppercase"
+  },
+  diagnosisText: {
+    fontSize: 11,
+    lineHeight: 1.6,
+    color: colors.secondary
+  },
+  protocolCard: {
+    padding: 20,
+    backgroundColor: "#eff6ff",
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: "#bfdbfe",
+    borderRadius: 10
+  },
+  protocolText: {
+    fontSize: 11,
+    lineHeight: 1.6,
+    color: "#1e40af",
+    fontWeight: 500
+  },
+  worryList: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 8
+  },
+  worryPill: {
+    paddingTop: 4,
+    paddingBottom: 4,
+    paddingLeft: 10,
+    paddingRight: 10,
+    backgroundColor: "#e2e8f0",
+    borderRadius: 100,
+    fontSize: 9,
+    fontWeight: 600,
+    color: colors.secondary
+  },
+  moodTable: {
+    marginTop: 8
+  },
+  moodRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    borderBottom: 1,
+    borderBottomColor: "#e2e8f0",
+    paddingBottom: 4,
+    marginBottom: 4
+  },
+  moodCell: {
+    fontSize: 9,
+    color: colors.muted,
+    width: "16%"
+  },
+  moodCellBold: {
+    fontSize: 9,
+    fontWeight: 700,
+    color: colors.primary,
+    width: "16%"
+  },
+  footer: {
+    position: "absolute",
+    bottom: 30,
+    left: 50,
+    right: 50,
+    borderTop: 1,
+    borderTopColor: colors.border,
+    paddingTop: 10,
+    textAlign: "center",
+    fontSize: 7,
+    color: colors.muted
+  }
 });
-
-// ── Components (Manual createElement for Node compatibility) ──────────────────
-
-const SectionTitle = ({ number, children }) => 
-  React.createElement(Text, { style: styles.sectionTitle }, `${number}. `, children);
-
-const InfoRow = ({ label, value }) => 
-  React.createElement(View, { style: styles.row },
-    React.createElement(Text, { style: styles.label }, label),
-    React.createElement(Text, { style: styles.value }, value || 'N/A')
-  );
-
-const Bullet = ({ children }) => 
-  React.createElement(View, { style: styles.bulletItem },
-    React.createElement(Text, { style: styles.bulletDot }, '  •'),
-    React.createElement(Text, { style: styles.bulletText }, children)
-  );
-
-const RecoveryProtocol = ({ protocol }) => {
-  if (!protocol) return null;
-  return React.createElement(View, { style: styles.recoveryBox },
-    React.createElement(Text, { style: styles.recoveryTitle }, '7. Clinical Recovery Protocol'),
-    
-    React.createElement(Text, { style: styles.recoverySub }, 'Primary Assessment:'),
-    React.createElement(Text, { style: styles.sectionBody }, protocol.diagnosis_baseline),
-    
-    React.createElement(Text, { style: styles.recoverySub }, 'Neuro-Dietary Protocol:'),
-    (protocol.neuro_diet_plan || []).map((item, i) => 
-      React.createElement(Bullet, { key: i }, item)
-    ),
-
-    React.createElement(Text, { style: styles.recoverySub }, 'Somatic Exercise Regimen:'),
-    React.createElement(Text, { style: styles.sectionBody }, protocol.somatic_exercise_plan),
-
-    React.createElement(Text, { style: [styles.sectionBody, { marginTop: 6, fontWeight: 600 }] },
-      'Confidence Anchor: ',
-      React.createElement(Text, { style: { fontWeight: 400 } }, protocol.confidence_anchor)
-    ),
-
-    React.createElement(Text, { style: { fontSize: 7, color: colors.muted, marginTop: 8, fontStyle: 'italic' } },
-      `* ${protocol.medical_disclaimer}`
-    )
-  );
-};
-
-// ── Document Definition ──────────────────────────────────────────────────────
-
-const ClinicalReportDocument = ({ report }) => {
-  const generatedAt = new Date(report.meta?.generatedAt || report.createdAt || Date.now()).toLocaleString('en-IN', {
-    dateStyle: 'medium', timeStyle: 'short'
+const Section = ({ title, children }) => /* @__PURE__ */ React.createElement(View, { style: styles.section }, /* @__PURE__ */ React.createElement(Text, { style: styles.sectionHeader }, title), children);
+const DiagnosisBox = ({ title, text }) => /* @__PURE__ */ React.createElement(View, { style: styles.diagnosisCard }, /* @__PURE__ */ React.createElement(Text, { style: styles.diagnosisTitle }, title), /* @__PURE__ */ React.createElement(Text, { style: styles.diagnosisText }, text));
+const ScoreLine = ({ label, value }) => /* @__PURE__ */ React.createElement(View, { style: { flexDirection: "row", justifyContent: "space-between", borderBottom: 1, borderBottomColor: "#e2e8f0", paddingBottom: 4, marginBottom: 4 } }, /* @__PURE__ */ React.createElement(Text, { style: { fontSize: 9, color: colors.muted } }, label), /* @__PURE__ */ React.createElement(Text, { style: { fontSize: 9, fontWeight: 700, color: colors.primary } }, value));
+const ClinicalReportDocument = ({ report, moodLogs }) => {
+  const generatedAt = new Date(report.meta?.generatedAt || report.createdAt || Date.now()).toLocaleString("en-IN", {
+    dateStyle: "medium",
+    timeStyle: "short"
   });
-
-  const riskColor = level => {
-    if (level === 'acute-distress') return colors.riskAcute;
-    if (level === 'pre-burnout') return colors.riskPre;
-    return colors.riskWatch;
-  };
-
-  const worries = (report.shatteredWorryBlocks || []).slice(0, 10);
-  const timeline = (report.timelineMicroquests || []).sort((a, b) => (a.order || 0) - (b.order || 0)).slice(0, 10);
-
-  return React.createElement(Document, null,
-    React.createElement(Page, { size: "A4", style: styles.page },
-      // Header
-      React.createElement(View, { style: styles.headerBar },
-        React.createElement(View, null,
-          React.createElement(Text, { style: styles.headerTitle }, "AuraOS Clinical Triage Report"),
-          React.createElement(Text, { style: styles.headerSub }, `Generated: ${generatedAt}  |  Report ID: ${report._id || 'N/A'}`)
-        ),
-        React.createElement(View, { style: [styles.riskBadge, { backgroundColor: riskColor(report.riskLevel) }] },
-          React.createElement(Text, { style: styles.riskBadgeText }, (report.riskLevel || 'WATCH').toUpperCase())
-        )
+  const riskColor = colors.risk[report.riskLevel] || colors.risk.watch;
+  const ai = report.aiBrief || {};
+  const guardianName = report.guardian?.name || "Not linked";
+  const guardianEmail = report.guardian?.email || "";
+  const guardianRelation = report.guardian?.relation || "Guardian";
+  const patientName = report.patientSnapshot?.name || report.userId || "Unknown Patient";
+  const patientAge = report.patientSnapshot?.age ? `${report.patientSnapshot.age} yrs` : "Age not specified";
+  const patientEmail = report.patientSnapshot?.email || "No email";
+  const patientPhone = report.patientSnapshot?.phone || "No phone";
+  return /* @__PURE__ */ React.createElement(Document, null, /* @__PURE__ */ React.createElement(Page, { size: "A4", style: styles.page },
+    /* Header */
+    /* @__PURE__ */ React.createElement(View, { style: styles.header },
+      /* @__PURE__ */ React.createElement(View, { style: styles.headerLeft },
+        /* @__PURE__ */ React.createElement(Text, { style: styles.brand }, "AuraOS"),
+        /* @__PURE__ */ React.createElement(Text, { style: styles.reportType }, "Clinical Session Diagnosis")
       ),
-
-      React.createElement(SectionTitle, { number: 1 }, "Session Context"),
-      React.createElement(InfoRow, { label: "Patient ID", value: String(report.userId || 'N/A').slice(0, 12) }),
-      React.createElement(InfoRow, { label: "Current Task", value: report.currentTask }),
-      React.createElement(InfoRow, { label: "Blocker", value: report.selectedBlocker }),
-      React.createElement(InfoRow, { label: "Vocal Arousal", value: `${Number(report.vocalArousalScore || 0).toFixed(1)} / 10` }),
-      
-      React.createElement(View, { style: styles.divider }),
-
-      React.createElement(SectionTitle, { number: 2 }, "Session Query"),
-      React.createElement(Text, { style: styles.sectionBody }, report.initialAnxietyQuery || 'No direct query captured.'),
-      
-      React.createElement(View, { style: styles.divider }),
-
-      React.createElement(SectionTitle, { number: 3 }, "Identified Worry Blocks"),
-      worries.length > 0 
-        ? worries.map((w, i) => React.createElement(Bullet, { key: i }, `"${w.text}" - weight ${w.weight}/10`))
-        : React.createElement(Text, { style: styles.sectionBody }, "None captured for this session."),
-
-      React.createElement(SectionTitle, { number: 4 }, "Task Timeline"),
-      timeline.length > 0
-        ? timeline.map((q, i) => React.createElement(Bullet, { key: i }, `[${q.completed ? '\u2713' : '\u25CB'}] ${q.action} (~${q.duration_minutes}m)`))
-        : React.createElement(Text, { style: styles.sectionBody }, "None captured for this session."),
-
-      React.createElement(View, { style: styles.divider }),
-
-      React.createElement(SectionTitle, { number: 5 }, "AI Clinical Summary"),
-      React.createElement(Text, { style: styles.sectionBody }, report.aiStressSummary || 'AI summary unavailable.'),
-
-      report.recoveryProtocol && React.createElement(RecoveryProtocol, { protocol: report.recoveryProtocol }),
-
-      React.createElement(View, { style: styles.divider }),
-
-      React.createElement(SectionTitle, { number: 6 }, "Guardian Contact"),
-      React.createElement(InfoRow, { label: "Guardian", value: report.guardian?.name }),
-      React.createElement(InfoRow, { label: "Contact", value: report.guardian?.phone || report.guardian?.email }),
-
-      React.createElement(Text, { style: styles.footer },
-        "This report is generated by AuraOS to support informed caregiving. Not a medical diagnosis. AuraOS - Neuroscience Powered Support."
+      /* @__PURE__ */ React.createElement(View, null,
+        /* @__PURE__ */ React.createElement(Text, { style: styles.metaInfo }, "REPORT ID: ", String(report._id).slice(-8).toUpperCase()),
+        /* @__PURE__ */ React.createElement(Text, { style: styles.metaInfo }, "DATE: ", generatedAt),
+        /* @__PURE__ */ React.createElement(Text, { style: [styles.metaInfo, { fontWeight: 700, color: colors.primary, marginTop: 4 }] }, "PATIENT: ", patientName, " (", patientAge, ")"),
+        /* @__PURE__ */ React.createElement(Text, { style: styles.metaInfo }, patientEmail, patientPhone ? " | " + patientPhone : ""),
+        /* @__PURE__ */ React.createElement(Text, { style: [styles.metaInfo, { fontWeight: 700, color: colors.primary, marginTop: 4 }] }, "GUARDIAN: ", guardianName, guardianEmail ? " <" + guardianEmail + ">" : ""),
+        /* @__PURE__ */ React.createElement(Text, { style: [styles.metaInfo, { color: colors.accent }] }, guardianRelation.toUpperCase())
       )
-    )
-  );
+    ),
+    /* Risk section */
+    /* @__PURE__ */ React.createElement(View, { style: [styles.riskSection, { backgroundColor: riskColor + "15", borderLeft: 5, borderLeftColor: riskColor }] },
+      /* @__PURE__ */ React.createElement(Text, { style: [styles.riskLabel, { backgroundColor: riskColor }] }, (report.riskLevel || "WATCH").replace("-", " ")),
+      /* @__PURE__ */ React.createElement(Text, { style: styles.riskDesc }, report.riskLevel === "acute-distress" ? "ALARM: Critical neurological load detected. Immediate somatic intervention required." : report.riskLevel === "pre-burnout" ? "WARNING: Sustained sympathetic activation. High risk of task paralysis." : "STABLE: Baseline stress detected. Normal coping mechanisms active.")
+    ),
+    /* Grid metrics */
+    /* @__PURE__ */ React.createElement(View, { style: styles.grid },
+      /* @__PURE__ */ React.createElement(View, { style: styles.gridItem }, /* @__PURE__ */ React.createElement(Text, { style: styles.gridLabel }, "Vocal Arousal Index"), /* @__PURE__ */ React.createElement(Text, { style: styles.gridValue }, Number(report.vocalArousalScore || 0).toFixed(1), " / 10.0")),
+      /* @__PURE__ */ React.createElement(View, { style: styles.gridItem }, /* @__PURE__ */ React.createElement(Text, { style: styles.gridLabel }, "Primary Blocker"), /* @__PURE__ */ React.createElement(Text, { style: styles.gridValue }, report.selectedBlocker || "Unspecified")),
+      /* @__PURE__ */ React.createElement(View, { style: styles.gridItem }, /* @__PURE__ */ React.createElement(Text, { style: styles.gridLabel }, "Report Window"), /* @__PURE__ */ React.createElement(Text, { style: styles.gridValue }, report.dateRangeDays ? `${report.dateRangeDays} days` : "Session")),
+      /* @__PURE__ */ React.createElement(View, { style: styles.gridItem }, /* @__PURE__ */ React.createElement(Text, { style: styles.gridLabel }, "Linked Guardian"), /* @__PURE__ */ React.createElement(Text, { style: styles.gridValue }, guardianName)),
+      /* @__PURE__ */ React.createElement(View, { style: [styles.gridItem, { width: "100%" }] }, /* @__PURE__ */ React.createElement(Text, { style: styles.gridLabel }, "Active Engagement Task"), /* @__PURE__ */ React.createElement(Text, { style: styles.gridValue }, report.currentTask || "N/A"))
+    ),
+    /* Clinical sections */
+    /* @__PURE__ */ React.createElement(Section, { title: "Executive Summary" }, /* @__PURE__ */ React.createElement(DiagnosisBox, { title: "Clinical Interpretation", text: report.aiBrief?.executive_summary || report.aiStressSummary || "No summary available." })),
+    /* @__PURE__ */ React.createElement(Section, { title: "Activity Diagnostics & Neurological Breakdown" }, /* @__PURE__ */ React.createElement(DiagnosisBox, { title: "Session Activities", text: report.aiBrief?.activity_analysis || "Activity diagnostic data was not generated for this session." })),
+    /* @__PURE__ */ React.createElement(Section, { title: "Patient Intake + Guardian Observations" }, /* @__PURE__ */ React.createElement(DiagnosisBox, { title: "Cross-Intake Correlation", text: report.aiBrief?.intake_correlations || "Intake correlation data was not available for this report." }), report.patientIntakeSnapshot?.derivedScores && /* @__PURE__ */ React.createElement(View, { style: styles.diagnosisCard }, /* @__PURE__ */ React.createElement(Text, { style: styles.diagnosisTitle }, "Patient Baseline Scores"), Object.entries(report.patientIntakeSnapshot.derivedScores).map(([key, value]) => /* @__PURE__ */ React.createElement(ScoreLine, { key, label: key, value: `${value}/10` }))), report.guardianIntakeSnapshot?.derivedScores && /* @__PURE__ */ React.createElement(View, { style: styles.diagnosisCard }, /* @__PURE__ */ React.createElement(Text, { style: styles.diagnosisTitle }, "Guardian Observation Scores"), Object.entries(report.guardianIntakeSnapshot.derivedScores).map(([key, value]) => /* @__PURE__ */ React.createElement(ScoreLine, { key, label: key, value: `${value}/10` })))),
+    /* @__PURE__ */ React.createElement(Section, { title: "Telemetry Correlations" }, /* @__PURE__ */ React.createElement(DiagnosisBox, { title: "Dynamic Synthesis", text: report.aiBrief?.telemetry_correlations || "Telemetry correlation data was not available for this report." })),
+    /* @__PURE__ */ React.createElement(Section, { title: "Neuro-Somatic Markers" }, /* @__PURE__ */ React.createElement(DiagnosisBox, { title: "Biological Stress Signal", text: report.aiBrief?.somatic_biological_markers || "Biological telemetry baseline within normal limits." })),
+    /* @__PURE__ */ React.createElement(Section, { title: "Cognitive Rigidity & Focus" }, /* @__PURE__ */ React.createElement(DiagnosisBox, { title: "Performance Analysis", text: report.aiBrief?.cognitive_rigidity_focus || "Focus markers indicate stable executive switching." })),
+    /* @__PURE__ */ React.createElement(Section, { title: "Clinical Protocol (Guardian Instructions)" }, /* @__PURE__ */ React.createElement(View, { style: styles.protocolCard }, /* @__PURE__ */ React.createElement(Text, { style: styles.protocolText }, report.aiBrief?.guardian_protocol || report.aiBrief?.actionable_protocol || "Monitor patient for signs of fatigue and provide hydration."))),
+    /* @__PURE__ */ React.createElement(Section, { title: "Protective Factors" }, /* @__PURE__ */ React.createElement(DiagnosisBox, { title: "Patient Strengths", text: report.aiBrief?.patient_strengths || "Protective factors were not available in this report." })),
+    /* Mood Logs Table */
+    moodLogs && moodLogs.length > 0 && /* @__PURE__ */ React.createElement(Section, { title: "Daily Mood Check-In Log (Last " + moodLogs.length + " entries)" },
+      /* @__PURE__ */ React.createElement(View, { style: styles.moodTable },
+        /* Header row */
+        /* @__PURE__ */ React.createElement(View, { style: [styles.moodRow, { backgroundColor: "#f1f5f9" }] },
+          /* @__PURE__ */ React.createElement(Text, { style: styles.moodCellBold }, "Date"),
+          /* @__PURE__ */ React.createElement(Text, { style: styles.moodCellBold }, "Battery"),
+          /* @__PURE__ */ React.createElement(Text, { style: styles.moodCellBold }, "Clarity"),
+          /* @__PURE__ */ React.createElement(Text, { style: styles.moodCellBold }, "Anxiety"),
+          /* @__PURE__ */ React.createElement(Text, { style: styles.moodCellBold }, "Energy"),
+          /* @__PURE__ */ React.createElement(Text, { style: styles.moodCellBold }, "Social")
+        ),
+        ...moodLogs.map((l, i) => /* @__PURE__ */ React.createElement(View, { key: i, style: styles.moodRow },
+          /* @__PURE__ */ React.createElement(Text, { style: styles.moodCell }, l.day || ""),
+          /* @__PURE__ */ React.createElement(Text, { style: styles.moodCell }, String(l.battery || "-") + "/5"),
+          /* @__PURE__ */ React.createElement(Text, { style: styles.moodCell }, String(l.brainFog || "-") + "/5"),
+          /* @__PURE__ */ React.createElement(Text, { style: styles.moodCell }, String(l.anxiety || "-") + "/5"),
+          /* @__PURE__ */ React.createElement(Text, { style: styles.moodCell }, String(l.energy || "-") + "/5"),
+          /* @__PURE__ */ React.createElement(Text, { style: styles.moodCell }, String(l.sociability || "-") + "/5")
+        ))
+      )
+    ),
+    /* Worry blocks */
+    report.shatteredWorryBlocks?.length > 0 && /* @__PURE__ */ React.createElement(Section, { title: "Extracted Cognitive Nodes (Worry Forge)" }, /* @__PURE__ */ React.createElement(View, { style: styles.worryList }, report.shatteredWorryBlocks.slice(0, 10).map((w, i) => /* @__PURE__ */ React.createElement(Text, { key: i, style: styles.worryPill }, w.text, " (", w.weight, "/10)")))),
+    /* Footer */
+    /* @__PURE__ */ React.createElement(Text, { style: styles.footer }, "CONFIDENTIAL CLINICAL REPORT. Generated by AuraOS Clinical Intelligence Layer. This document is intended for guardians and clinicians to support behavioral triage. AuraOS - Vihaan DTU 9.0 Digital Therapeutic.")
+  ));
 };
-
-// ── Export ───────────────────────────────────────────────────────────────────
-
-export const buildClinicalReportPdfBuffer = async report => {
-  return await renderToBuffer(React.createElement(ClinicalReportDocument, { report: report }));
+const buildClinicalReportPdfBuffer = async (report, moodLogs = []) => {
+  const mappedReport = {
+    ...report,
+    aiBrief: report.aiBrief || {
+      executive_summary: report.aiStressSummary,
+      activity_analysis: "Legacy report: activity analysis not stored.",
+      intake_correlations: "Legacy report: intake correlations were not stored.",
+      telemetry_correlations: "Legacy report: telemetry correlations were not stored.",
+      somatic_biological_markers: "Vocal arousal detected at " + report.vocalArousalScore + "/10.",
+      cognitive_rigidity_focus: "Performance data not fully analyzed in legacy report.",
+      actionable_protocol: "Check in with the patient using warm, supportive language.",
+      guardian_protocol: "Check in with the patient using warm, supportive language.",
+      patient_strengths: "Legacy report: strengths were not stored."
+    }
+  };
+  return await renderToBuffer(/* @__PURE__ */ React.createElement(ClinicalReportDocument, { report: mappedReport, moodLogs: moodLogs || [] }));
+};
+export {
+  buildClinicalReportPdfBuffer
 };
