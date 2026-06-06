@@ -201,7 +201,6 @@ export default function GuardianDashboard() {
               Last Synced: {lastSynced}
             </div>
           )}
-        </div>
           {/* Patient selector */}
           {patients.length > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
