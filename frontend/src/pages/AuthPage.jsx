@@ -91,7 +91,7 @@ export default function AuthPage() {
           const role = currentMode === 'EMPLOYEE' ? 'committee' : 'guardian';
           const payload = currentMode === 'EMPLOYEE' 
              ? { name: form.name, targetEmployeeId: form.targetEmployeeId, password: form.password, role } 
-             : { email: form.email, targetClientToken: form.inviteCode, password: form.password, role };
+             : { email: form.email, password: form.password, role };
 
           const res = await authApi.login(payload);
           
@@ -228,13 +228,7 @@ export default function AuthPage() {
               </div>
             )}
 
-            {/* GUARDIAN LOGIN: Target Client Sync Token */}
-            {currentMode === 'CLIENT' && isSecondary && actionType === 'login' && (
-              <div>
-                <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-3)', display: 'block', marginBottom: 6, letterSpacing: '0.04em', textTransform: 'uppercase' }}>Target Client Sync Token</label>
-                <input className="tg-input" type="text" placeholder="XXXX-XXXX" value={form.inviteCode} onChange={setF('inviteCode')} required />
-              </div>
-            )}
+
 
 
             <div>
