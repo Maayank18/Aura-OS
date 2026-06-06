@@ -51,19 +51,21 @@ const GuardianBriefSchema = z.object({
 
 /* ── OpenRouter client factory ───────────────────────────────────────────── */
 const makeModel = (schema, name, temp = 0.38) => {
-  const apiKey = process.env.OPENROUTER_API_KEY; 
-  if (!apiKey) throw new Error('API_KEY is not set.');
-  
-  const llm = new ChatOpenAI({
-    modelName: process.env.OPENROUTER_MODEL || 'openai/gpt-4o-mini',
-    temperature: temp,
-    apiKey: apiKey,
-    configuration: {
-      baseURL: 'https://openrouter.ai/api/v1',
-      defaultHeaders: {
-        'Authorization': `Bearer ${apiKey}`,
-        'HTTP-Referer': 'http://localhost:5173',
-        'X-Title': 'AuraOS',
+  try {
+    const apiKey = process.env.OPENROUTER_API_KEY; 
+    if (!apiKey) throw new Error('API_KEY is not set.');
+    
+    const llm = new ChatOpenAI({
+      modelName: process.env.OPENROUTER_MODEL || 'openai/gpt-4o-mini',
+      temperature: temp,
+      apiKey: apiKey,
+      configuration: {
+        baseURL: 'https://openrouter.ai/api/v1',
+        defaultHeaders: {
+          'Authorization': `Bearer ${apiKey}`,
+          'HTTP-Referer': 'http://localhost:5173',
+          'X-Title': 'AuraOS',
+        }
       }
     });
     return llm.withStructuredOutput(schema, { name, strict: true });
@@ -229,12 +231,7 @@ export const generateGuardianBrief = async (data) => {
     : '  No guardian alerts in range.';
 
   const contextBlock = `
-PATIENT: ${data.userName}
-TASK: "${data.taskSummary}"
-BLOCKER: "${data.blocker}"
-VOCAL AROUSAL: ${data.vocalArousal}/10
-EMOTION: ${data.emotion}
-  `.trim();
+=== TELEMETRY PAYLOAD ===
 
 PATIENT: \${safe(data.userName)}
 CURRENT TASK: "\${safe(data.taskSummary, 'unspecified')}"
