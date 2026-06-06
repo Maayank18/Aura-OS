@@ -5,6 +5,8 @@
 
 import mongoose from 'mongoose';
 
+export let dbReady = false;
+
 const MAX_RETRIES = 5;
 const RETRY_DELAY_MS = 3000;
 
@@ -26,6 +28,7 @@ const connectDB = async () => {
       });
 
       console.log(`[DB] MongoDB connected → ${conn.connection.host}`);
+      dbReady = true;
       break; // success — exit the retry loop
     } catch (err) {
       console.error(`[DB] Connection attempt ${attempt}/${MAX_RETRIES} failed: ${err.message}`);

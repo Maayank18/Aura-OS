@@ -25,6 +25,12 @@ export const setAuthSession = ({ token, account }) => {
   
   useStore.getState().setAuth({ token, account });
 
+  if (account && (account.role === 'client' || account.role === 'patient' || account.accountType === 'CLIENT')) {
+    const uid = account.userStateId || account.id;
+    useStore.setState({ userId: uid });
+    localStorage.setItem('aura-userId', uid);
+  }
+
   if (!isStateless) {
     if (token) localStorage.setItem(TOKEN_KEY, token);
     if (account) localStorage.setItem(ACCOUNT_KEY, JSON.stringify(account));
@@ -35,6 +41,7 @@ export const clearAuthSession = () => {
   useStore.getState().setAuth({ token: null, account: null });
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(ACCOUNT_KEY);
+  localStorage.removeItem('aura-userId');
 };
 
 const req = async (method, path, body, timeoutMs = API_TIMEOUT) => {

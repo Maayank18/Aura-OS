@@ -12,6 +12,7 @@ import {
   generateSessionReportHandler,
   downloadSessionReportPdfHandler,
   generateRecoveryProtocolHandler,
+  logGameSessionHandler,
 } from '../controllers/clinicalCtrl.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 
@@ -22,6 +23,9 @@ router.post('/trigger-alert',   asyncHandler(triggerAlertHandler));
 
 // Vocal stress event logging (called by Python backend proxy or direct)
 router.post('/vocal-stress',    asyncHandler(logVocalStressHandler));
+
+// Game session telemetry logging
+router.post('/game-session',    asyncHandler(logGameSessionHandler));
 
 // Guardian setup/update
 router.post('/guardian',        asyncHandler(setGuardianHandler));

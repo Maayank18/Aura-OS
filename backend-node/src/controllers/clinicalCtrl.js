@@ -268,7 +268,7 @@ export const triggerAlertHandler = async (req, res, next) => {
     }
 
     // Resolve patientId + guardianId for relational AlertLog linking
-    const patientRecord = await ClientUserModel.findById(userId).select('_id guardianId').lean() || await Patient.findOne({ userStateId: userId }).select('_id guardianId').lean();
+    const patientRecord = (mongoose.Types.ObjectId.isValid(userId) ? await ClientUserModel.findById(userId).select('_id guardianId').lean() : null) || await Patient.findOne({ userStateId: userId }).select('_id guardianId').lean();
 
     await AlertLog.create({
       userId,
@@ -317,6 +317,31 @@ export const logVocalStressHandler = async (req, res, next) => {
   }
 };
 
+// ── POST /api/clinical/game-session ──────────────────────────────────────────
+// Called by the frontend directly after each Cognitive Forge mini-game.
+export const logGameSessionHandler = async (req, res, next) => {
+  try {
+    const { userId, sessionData } = req.body;
+    if (!userId) throw new AppError('userId is required.', 400);
+
+    const user = await UserState.findOrCreate(userId);
+    user.ensureClinicalTelemetry?.();
+    if (!Array.isArray(user.clinicalTelemetry.gameSessions)) {
+      user.clinicalTelemetry.gameSessions = [];
+    }
+    user.clinicalTelemetry.gameSessions.push({
+      ...sessionData,
+      completedAt: sessionData.completedAt || new Date(),
+    });
+    user.markModified('clinicalTelemetry.gameSessions');
+    user.markModified('clinicalTelemetry');
+    await user.save();
+
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+};
 
 // ── POST /api/clinical/guardian ───────────────────────────────────────────────
 // Set or update the guardian contact for this user.
@@ -359,6 +384,7 @@ export const setGuardianHandler = async (req, res, next) => {
 // Returns recharts-ready arrays for the Observer Portal.
 export const getGuardianDashboardHandler = async (req, res, next) => {
   try {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     const days = normalizeGuardianDays(req.query.days);
     const { guardian, patient, guardianIntake } = await ensureGuardianPatientAccess(req.auth.id, req.query.patientId);
 
@@ -401,7 +427,11 @@ export const getGuardianDashboardHandler = async (req, res, next) => {
     const execRaw = (telemetry.executiveFunction || []).filter((e) => new Date(e.timestamp) > since);
     const forgeRaw = (telemetry.forgeSessions || []).filter((e) => new Date(e.timestamp) > since);
     const spikes = (telemetry.stressSpikes || []).filter((e) => new Date(e.timestamp) > since);
-    const gameSessions = collectRecentGameSessions(reports);
+    
+    const gameSessionsFromReports = collectRecentGameSessions(reports);
+    const gameSessionsFromTelemetry = (telemetry.gameSessions || []).filter((e) => new Date(e.completedAt || e.timestamp) > since);
+    const allGameSessions = [...gameSessionsFromTelemetry, ...gameSessionsFromReports];
+    const gameSessions = Array.from(new Map(allGameSessions.map(g => [new Date(g.completedAt || g.timestamp).getTime(), g])).values());
     const consent = patient.privacyConsent || {};
 
     const isNewModel = guardian.accountType === 'GUARDIAN';
@@ -481,22 +511,27 @@ export const generateGuardianDynamicReportHandler = async (req, res, next) => {
     }
 
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-    const user = await UserState.findOne({ userId: patient.userStateId }).lean();
+    const userStateId = patient.userStateId || patient._id.toString();
+    const user = await UserState.findOne({ userId: userStateId }).lean();
     const telemetry = user?.clinicalTelemetry || {};
-    const alerts = await AlertLog.find({ userId: patient.userStateId, sentAt: { $gte: since } }).sort({ sentAt: -1 }).limit(20).lean();
-    const priorReports = await ClinicalReport.find({ userId: patient.userStateId, createdAt: { $gte: since } }).sort({ createdAt: -1 }).limit(20).lean();
+    const alerts = await AlertLog.find({ userId: userStateId, sentAt: { $gte: since } }).sort({ sentAt: -1 }).limit(20).lean();
+    const priorReports = await ClinicalReport.find({ userId: userStateId, createdAt: { $gte: since } }).sort({ createdAt: -1 }).limit(20).lean();
 
     const vocalEvents = (telemetry.vocalStressEvents || []).filter((e) => new Date(e.timestamp) > since);
     const execEvents = (telemetry.executiveFunction || []).filter((e) => new Date(e.timestamp) > since);
     const forgeEvents = (telemetry.forgeSessions || []).filter((e) => new Date(e.timestamp) > since);
     const spikes = (telemetry.stressSpikes || []).filter((e) => new Date(e.timestamp) > since);
-    const gameSessions = collectRecentGameSessions(priorReports);
+    
+    const gameSessionsFromReports = collectRecentGameSessions(priorReports);
+    const gameSessionsFromTelemetry = (telemetry.gameSessions || []).filter((e) => new Date(e.completedAt || e.timestamp) > since);
+    const allGameSessions = [...gameSessionsFromTelemetry, ...gameSessionsFromReports];
+    const gameSessions = Array.from(new Map(allGameSessions.map(g => [new Date(g.completedAt || g.timestamp).getTime(), g])).values());
     const avgArousal = vocalEvents.length
       ? +(vocalEvents.reduce((sum, event) => sum + (event.arousalScore || 5), 0) / vocalEvents.length).toFixed(1)
       : 5;
 
     const brief = await generateGuardianBrief({
-      userName: patient.displayName || patient.userStateId,
+      userName: patient.displayName || patient.name || userStateId,
       taskSummary: `${days}-day guardian clinical review`,
       blocker: execEvents.filter((e) => e.status === 'abandoned').length > execEvents.filter((e) => e.status === 'completed').length
         ? 'repeated freeze or task abandonment pattern'
@@ -522,7 +557,7 @@ export const generateGuardianDynamicReportHandler = async (req, res, next) => {
     });
 
     const report = await ClinicalReport.create({
-      userId: patient.userStateId,
+      userId: userStateId,
       patientId: patient._id,
       guardianId: guardian._id,
       dateRangeDays: days,
@@ -700,7 +735,7 @@ export const generateSessionReportHandler = async (req, res, next) => {
     if (!userId) throw new AppError('userId is required.', 400);
 
     const user = await UserState.findOrCreate(userId);
-    const patientRecord = await ClientUserModel.findById(userId).lean() || await Patient.findOne({ userStateId: userId }).lean() || {};
+    const patientRecord = (mongoose.Types.ObjectId.isValid(userId) ? await ClientUserModel.findById(userId).lean() : null) || await Patient.findOne({ userStateId: userId }).lean() || {};
     
     const activeTask = taskId
       ? (user.taskHistory || []).find((t) => t.id === taskId)
@@ -809,13 +844,16 @@ export const generateSessionReportHandler = async (req, res, next) => {
 
     const downloadUrl = buildPublicReportUrl(req, report._id.toString());
     // Fetch recent mood logs to include in PDF
-    let patientMood = report.patientId
-      ? await ClientUserModel.findById(report.patientId).select('dailyMoodLogs').lean()
-      : await ClientUserModel.findById(userId).select('dailyMoodLogs').lean();
-    if (!patientMood) {
-      patientMood = report.patientId
-        ? await Patient.findById(report.patientId).select('dailyMoodLogs').lean()
-        : await Patient.findOne({ userStateId: userId }).select('dailyMoodLogs').lean();
+    let patientMood = null;
+    if (report.patientId) {
+      patientMood = await ClientUserModel.findById(report.patientId).select('dailyMoodLogs').lean() || await Patient.findById(report.patientId).select('dailyMoodLogs').lean();
+    } else {
+      if (mongoose.Types.ObjectId.isValid(report.userId)) {
+        patientMood = await ClientUserModel.findById(report.userId).select('dailyMoodLogs').lean();
+      }
+      if (!patientMood) {
+        patientMood = await Patient.findOne({ userStateId: report.userId }).select('dailyMoodLogs').lean();
+      }
     }
     const moodLogsForPdf = (patientMood?.dailyMoodLogs || [])
       .sort((a, b) => new Date(b.loggedAt) - new Date(a.loggedAt))
@@ -933,13 +971,16 @@ export const downloadSessionReportPdfHandler = async (req, res, next) => {
     if (!report) throw new AppError('Report not found or expired from local memory.', 404);
 
     // Fetch recent mood logs to hydrate the PDF
-    let patientMood = report.patientId
-      ? await ClientUserModel.findById(report.patientId).select('dailyMoodLogs').lean()
-      : await ClientUserModel.findById(report.userId).select('dailyMoodLogs').lean();
-    if (!patientMood) {
-      patientMood = report.patientId
-        ? await Patient.findById(report.patientId).select('dailyMoodLogs').lean()
-        : await Patient.findOne({ userStateId: report.userId }).select('dailyMoodLogs').lean();
+    let patientMood = null;
+    if (report.patientId) {
+      patientMood = await ClientUserModel.findById(report.patientId).select('dailyMoodLogs').lean() || await Patient.findById(report.patientId).select('dailyMoodLogs').lean();
+    } else {
+      if (mongoose.Types.ObjectId.isValid(report.userId)) {
+        patientMood = await ClientUserModel.findById(report.userId).select('dailyMoodLogs').lean();
+      }
+      if (!patientMood) {
+        patientMood = await Patient.findOne({ userStateId: report.userId }).select('dailyMoodLogs').lean();
+      }
     }
     const moodLogsForPdf = (patientMood?.dailyMoodLogs || [])
       .sort((a, b) => new Date(b.loggedAt) - new Date(a.loggedAt))

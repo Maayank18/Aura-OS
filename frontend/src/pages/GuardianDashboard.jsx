@@ -107,14 +107,19 @@ export default function GuardianDashboard() {
   const [generating, setGen]      = useState(false);
   const [report, setReport]       = useState(null);
   const [reportId, setReportId]   = useState(null);
+  const [lastSynced, setLastSynced] = useState(null);
 
-  const fetchDashboard = useCallback(async (pid) => {
-    setLoading(true); setError(null);
+  const fetchDashboard = useCallback(async (pid, isSilent = false) => {
+    if (!isSilent) { setLoading(true); setError(null); }
     try {
       const res = await clinicalApi.guardianDashboard(pid || '', days);
       setPatients(res.patients || []);
       if (res.patient?.id && !pid) setPatientId(res.patient.id);
-      setData(res);
+      
+      // Deep clone to guarantee React array mutation detection
+      setData(JSON.parse(JSON.stringify(res)));
+      setLastSynced(new Date().toLocaleTimeString());
+
       if ((res.patients?.length === 0) && !res.patient) {
         navigate('/guardian/link');
       }
@@ -125,11 +130,20 @@ export default function GuardianDashboard() {
         setError(e.message);
       }
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   }, [days, navigate]);
 
   useEffect(() => { fetchDashboard(patientId); }, [patientId, days]); // eslint-disable-line
+
+  // Live polling every 5 seconds
+  useEffect(() => {
+    if (!patientId) return;
+    const interval = setInterval(() => {
+      fetchDashboard(patientId, true);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [patientId, fetchDashboard]);
 
   const handleGenerateReport = async () => {
     if (!patientId) return;
@@ -169,6 +183,25 @@ export default function GuardianDashboard() {
       {/* ── Top bar ── */}
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 16, marginBottom: 28 }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 16 }}>
+          <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-1)', margin: 0 }}>
+            Guardian Portal
+          </h1>
+          {lastSynced && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              background: 'rgba(34, 197, 94, 0.08)', border: '1px solid rgba(34, 197, 94, 0.2)',
+              color: '#4ade80', padding: '4px 10px', borderRadius: 999,
+              fontSize: 11, fontWeight: 700, letterSpacing: '0.02em',
+            }}>
+              <motion.div
+                animate={{ opacity: [1, 0.4, 1] }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+                style={{ width: 6, height: 6, borderRadius: '50%', background: '#4ade80', boxShadow: '0 0 6px #4ade80' }}
+              />
+              Last Synced: {lastSynced}
+            </div>
+          )}
+        </div>
           {/* Patient selector */}
           {patients.length > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

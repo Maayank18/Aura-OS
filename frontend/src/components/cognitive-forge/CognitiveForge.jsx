@@ -1276,28 +1276,42 @@ export default function CognitiveForge() {
 
   const handleGameSessionEnd = useCallback(rawMetrics => {
     const predictedEffects = derivePredictedEffects(rawMetrics.gameId, rawMetrics);
-    setGameSessions(prev => [...prev, { ...rawMetrics, predictedEffects, completedAt: new Date().toISOString() }]);
+    const sessionData = { ...rawMetrics, predictedEffects, completedAt: new Date().toISOString() };
+    setGameSessions(prev => [...prev, sessionData]);
     if (rawMetrics.gameId !== 'metronome_tapping') setActiveGame(null);
     setReportMsg(`${rawMetrics.gameName} logged · ${rawMetrics.durationSeconds}s`);
     setTimeout(() => setReportMsg(null), 3000);
-  }, []);
+
+    if (userId) {
+      import('../../services/portalApi.js').then(({ clinicalApi }) => {
+        clinicalApi.logGameSession({ userId, sessionData }).catch(() => {});
+      });
+    }
+  }, [userId]);
 
   const handleExtract = async () => {
     if (!text.trim() || isLoading) return;
-    
-    const wordsArray = text.split(' ').filter(w => w.trim() !== '');
-    if (wordsArray.length === 0) return;
-    
-    const nextWorries = wordsArray.map((w, idx) => ({ id: idx + 1, uuid: uuidv4(), worry: w, weight: 5, status: 'active' }));
-    setWorries(nextWorries);
-    clearAll();
-    
-    spawnWords(wordsArray);
-    
-    setHasBlocks(true);
-    setShowInput(false);
-    setDestroyedN(0);
-    comboRef.current = 0;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await forgeApi.extract(text, userId);
+      if (res.success && res.worries && res.worries.length > 0) {
+        setWorries(res.worries);
+        clearAll();
+        spawnWords(res.worries.map(w => w.worry));
+        
+        setHasBlocks(true);
+        setShowInput(false);
+        setDestroyedN(0);
+        comboRef.current = 0;
+      } else {
+        setError(res.message || "Couldn't identify distinct worries. Try being more specific.");
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to forge blocks.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleGenerateReport = async () => {

@@ -21,6 +21,10 @@ const req = async (method, path, body, timeoutMs = API_TIMEOUT) => {
   const ctrl  = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
+    if (method === 'POST' && path.includes('session')) {
+      console.log("OUTBOUND TELEMETRY:", body);
+    }
+
     const res  = await fetch(`${BASE}${path}`, {
       method,
       headers: {
@@ -44,6 +48,11 @@ const req = async (method, path, body, timeoutMs = API_TIMEOUT) => {
     if (!res.ok || !json.success) {
       throw new Error(json.error || `Request failed (${res.status})`);
     }
+
+    if (method === 'POST' && path.includes('session')) {
+      console.log("TELEMETRY SUCCESS");
+    }
+
     return json;
   } catch (err) {
     if (err.name === 'AbortError') throw new Error('Request timed out — the AI is generating your report.');
@@ -57,9 +66,10 @@ export const clinicalApi = {
   // Called on "too overwhelming" selection in TaskShatter
   triggerAlert:    (body)     => req('POST', '/trigger-alert',  body, AI_TIMEOUT),
 
-  // Full session report generation + optional guardian dispatch
   sessionReport:   (body)     => req('POST', '/session-report', body, AI_TIMEOUT),
   reportPdfUrl:    (reportId) => `${BASE}/session-report/${reportId}/pdf`,
+
+  logGameSession:  (body)     => req('POST', '/game-session', body),
 
   // Guardian setup
   setGuardian:     (body)     => req('POST', '/guardian',       body),

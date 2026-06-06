@@ -98,6 +98,8 @@ const ClinicalTelemetrySchema = new mongoose.Schema({
   // PerceptionProbe bistable illusion sessions — measures cognitive flexibility
   // Each entry: { imageId, firstSeen, latencyMs, canSwitchPerspective, recordedAt }
   probeData:              [{ type: mongoose.Schema.Types.Mixed, default: {} }],
+  gameSessions:           { type: [mongoose.Schema.Types.Mixed],  default: [] },
+
 }, { _id: false });
 
 /* ── Root schema ───────────────────────────────────────────── */
@@ -157,7 +159,7 @@ function _inMemoryFallback(userId) {
     vaultedWorries: [],
     taskHistory: [],
     guardian: {},
-    clinicalTelemetry: { vocalStressEvents: [], forgeSessions: [], executiveFunction: [], stressSpikes: [] },
+    clinicalTelemetry: { vocalStressEvents: [], forgeSessions: [], executiveFunction: [], stressSpikes: [], gameSessions: [] },
     ensureClinicalTelemetry() {},
     logVocalStress: async () => {},
     logForgeSession: async () => {},
@@ -182,6 +184,9 @@ UserStateSchema.methods.ensureClinicalTelemetry = function () {
   }
   if (!Array.isArray(this.clinicalTelemetry.stressSpikes)) {
     this.clinicalTelemetry.stressSpikes = [];
+  }
+  if (!Array.isArray(this.clinicalTelemetry.gameSessions)) {
+    this.clinicalTelemetry.gameSessions = [];
   }
 };
 
