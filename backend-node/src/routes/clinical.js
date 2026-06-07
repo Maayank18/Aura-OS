@@ -22,7 +22,7 @@ const router = express.Router();
 // Panic trigger from TaskShatter (most critical — fast path)
 router.post('/trigger-alert',   asyncHandler(triggerAlertHandler));
 
-// Vocal stress event logging (called by Python backend proxy or direct)
+// Vocal stress event logging
 router.post('/vocal-stress',    asyncHandler(logVocalStressHandler));
 
 // New Aura Voice Semantic Triage

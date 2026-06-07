@@ -7,14 +7,14 @@ let aiClient = null;
 
 const getClient = () => {
   if (!aiClient) {
-    // Priority 1: Groq, Priority 2: OpenRouter
-    const apiKey = process.env.GROQ_API_KEY || process.env.OPENROUTER_API_KEY;
+    // Priority 1: Groq (Forge), Priority 2: OpenRouter
+    const apiKey = process.env.GROQ_API_KEY_FORGE || process.env.GROQ_API_KEY || process.env.OPENROUTER_API_KEY;
     if (!apiKey) {
-      throw new Error('API_KEY (GROQ or OPENROUTER) is not set in environment variables.');
+      throw new Error('API_KEY (GROQ_API_KEY_FORGE, GROQ_API_KEY, or OPENROUTER_API_KEY) is not set in environment variables.');
     }
 
     aiClient = new OpenAI({
-      baseURL: process.env.GROQ_API_KEY 
+      baseURL: (process.env.GROQ_API_KEY_FORGE || process.env.GROQ_API_KEY)
         ? 'https://api.groq.com/openai/v1' 
         : 'https://openrouter.ai/api/v1',
       apiKey: apiKey,
@@ -64,7 +64,7 @@ export const extractWorries = async (rawText) => {
     return localFallbackExtraction(rawText);
   }
 
-  const modelName = process.env.GROQ_API_KEY 
+  const modelName = (process.env.GROQ_API_KEY_FORGE || process.env.GROQ_API_KEY)
     ? (process.env.GROQ_MODEL || 'llama-3.1-8b-instant')
     : (process.env.OPENROUTER_MODEL || 'openai/gpt-4o-mini');
 
@@ -81,7 +81,10 @@ export const extractWorries = async (rawText) => {
       response_format: { type: 'json_object' } 
     });
 
-    const parsed = JSON.parse(response.choices.message.content);
+    const content = response.choices?.[0]?.message?.content;
+    if (!content) throw new Error('AI provider returned an empty completion.');
+
+    const parsed = JSON.parse(content);
     return parsed.worries || [];
 
   } catch (err) {

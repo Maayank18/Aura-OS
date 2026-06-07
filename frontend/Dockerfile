@@ -39,14 +39,6 @@ server {
     gzip on;
     gzip_types text/plain text/css application/json application/javascript text/xml;
 
-    # API proxy → Node backend
-    location /api/v1/ {
-        proxy_pass http://aura-python:8000;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_read_timeout 30s;
-    }
-
     location /api/ {
         proxy_pass http://aura-node:5001;
         proxy_http_version 1.1;
@@ -57,15 +49,6 @@ server {
         proxy_read_timeout 30s;
     }
 
-    # WebSocket proxy → Python backend
-    location /ws/ {
-        proxy_pass http://aura-python:8000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_read_timeout 86400s;
-    }
 
     # SPA fallback
     location / {

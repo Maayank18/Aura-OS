@@ -15,12 +15,7 @@ vi.mock('framer-motion', () => {
     }
 });
 
-// mock pythonApi.ragProtocol
-vi.mock('../../services/api.js', () => ({
-  pythonApi: {
-    ragProtocol: vi.fn().mockResolvedValue({ success: true, protocol: 'Mocked protocol content' }),
-  }
-}));
+
 
 describe('ClinicalRecovery', () => {
   it('renders intake warning when user profile is missing', () => {

@@ -507,8 +507,8 @@
           <h3>Conversational Emotion AI</h3>
           <p>When you can't type, just speak. Aura reads the <strong>acoustic character</strong> of your anxiety — not just your words — and adapts its response in real-time.</p>
           <ul class="feature-bullets">
-            <li>Web Audio API → WebSocket to Python ML pipeline</li>
-            <li>librosa/wav2vec pitch & cadence extraction detects stress</li>
+            <li>Web Audio API → WebSocket to Node/LLM pipeline</li>
+            <li>Native Web Speech API extracts pitch & cadence to detect stress</li>
             <li>Three emotion modes: calm · mild anxiety · high anxiety</li>
             <li>Each mode triggers different UI glow, response length & grounding prompts</li>
             <li>ElevenLabs TTS for emotionally nuanced voice responses</li>
@@ -574,7 +574,7 @@
         <div class="tech-item"><div class="icon">🧲</div><h4>Matter.js</h4><p>2D rigid body physics for worry blocks</p></div>
         <div class="tech-item"><div class="icon">🧠</div><h4>LangChain + Groq</h4><p>Schema-validated AI with Zod types</p></div>
         <div class="tech-item"><div class="icon">✨</div><h4>Google Gemini</h4><p>Flash model for worry extraction</p></div>
-        <div class="tech-item"><div class="icon">🐍</div><h4>FastAPI + Whisper</h4><p>Low-latency Python audio pipeline</p></div>
+
         <div class="tech-item"><div class="icon">🗄️</div><h4>MongoDB Atlas</h4><p>Flexible document store for telemetry</p></div>
         <div class="tech-item"><div class="icon">🔊</div><h4>ElevenLabs TTS</h4><p>Emotionally nuanced voice output</p></div>
         <div class="tech-item"><div class="icon">📊</div><h4>Zustand + Recharts</h4><p>Lightweight state + clinical dashboards</p></div>
@@ -587,7 +587,7 @@
     <div class="container reveal">
       <span class="section-label" style="display:flex;justify-content:center"><span class="dot"></span> Architecture</span>
       <h2>Microservices by design</h2>
-      <p class="subtitle">The Python backend runs real-time ML audio — isolated from Node so a slow LLM call never blocks the physics canvas.</p>
+      <p class="subtitle">The backend architecture runs real-time LLM audio — isolated from the physics canvas.</p>
       <div class="arch-diagram">
         <div class="arch-row single">
           <div class="arch-box" style="border-color:rgba(0,229,255,0.2)">
@@ -603,11 +603,7 @@
             <p>Express · LangChain · Gemini · Twilio · PDFKit · Mongoose</p>
             <span class="tech-label" style="background:rgba(196,181,253,0.1);color:var(--lavender)">:5001 REST API</span>
           </div>
-          <div class="arch-box" style="border-color:rgba(255,179,0,0.2)">
-            <h4>🐍 Backend Python</h4>
-            <p>FastAPI · Whisper · librosa · Groq · ElevenLabs</p>
-            <span class="tech-label" style="background:rgba(255,179,0,0.1);color:var(--amber)">:8000 WebSocket</span>
-          </div>
+
           <div class="arch-box" style="border-color:rgba(0,191,165,0.2)">
             <h4>🗄️ MongoDB Atlas</h4>
             <p>UserState · AlertLog · ClinicalReport · TaskHistory</p>
@@ -679,9 +675,9 @@
         <div class="team-card">
           <div class="team-avatar" style="background:linear-gradient(135deg,var(--amber),var(--teal))">D</div>
           <h4>Deepanshu</h4>
-          <p class="role">Audio ML · Speech Emotion · Python Backend</p>
+          <p class="role">Audio ML · Speech Emotion</p>
           <div class="tags">
-            <span>FastAPI</span><span>Whisper</span><span>librosa</span><span>Groq</span><span>ElevenLabs</span>
+            <span>Web Audio API</span><span>Native Speech APIs</span><span>Groq</span><span>ElevenLabs</span>
           </div>
         </div>
       </div>

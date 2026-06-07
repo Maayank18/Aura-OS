@@ -1,52 +1,24 @@
-// src/hooks/useAudioStream.js
-// Feature 1: Manages the full audio pipeline for AuraVoice.
-//
-// Responsibilities:
-//  1. getUserMedia → capture mic
-//  2. Web Audio API → AnalyserNode for the visualizer canvas
-//  3. ScriptProcessorNode → chunk PCM audio → WebSocket → Python backend
-//  4. Receive JSON messages from Python: transcript | response | emotion_update
-//  5. Receive TTS audio (base64) → decode → play back
-
 import { useRef, useCallback, useEffect } from 'react';
 import useStore from '../store/useStore.js';
+import { clinicalApi } from '../services/api.js';
 
 const isBrowser = typeof window !== 'undefined';
-
-const toWsProtocol = (protocol) => (protocol === 'https:' ? 'wss:' : 'ws:');
-
-const resolveWsUrl = (userId) => {
-  if (!isBrowser) return null;
-
-  // Optional override for production: VITE_AUDIO_WS_URL=ws://host:8000/ws/audio
-  const fromEnv = (import.meta.env.VITE_AUDIO_WS_URL || '').trim();
-  if (fromEnv) {
-    const joiner = fromEnv.includes('?') ? '&' : '?';
-    return `${fromEnv}${joiner}userId=${encodeURIComponent(userId || '')}`;
-  }
-
-  // In local dev, connect directly to Python to avoid Vite WS proxy churn.
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    return `ws://localhost:8000/ws/audio?userId=${encodeURIComponent(userId || '')}`;
-  }
-
-  // Default path for production/reverse-proxy.
-  const wsProtocol = toWsProtocol(window.location.protocol);
-  return `${wsProtocol}//${window.location.host}/ws/audio?userId=${encodeURIComponent(userId || '')}`;
-};
-
-const BUFFER_SIZE = 4096;
-const SAMPLE_RATE = 16000; // Whisper expects 16kHz
+const SAMPLE_RATE = 16000;
 
 export default function useAudioStream() {
   const audioCtxRef = useRef(null);
   const analyserRef = useRef(null);
-  const processorRef = useRef(null);
   const streamRef = useRef(null);
-  const wsRef = useRef(null);
   const animFrameRef = useRef(null);
-  const ttsSourceRef = useRef(null);
+  const recognitionRef = useRef(null);
   const audioMutedRef = useRef(false);
+  const transcriptStartTimeRef = useRef(null);
+  const latestTranscriptRef = useRef('');
+  const processingRef = useRef(false);
+  const sessionActiveRef = useRef(false);
+  
+  // Track continuous volume
+  const volumeHistoryRef = useRef([]);
 
   const {
     userId,
@@ -60,26 +32,28 @@ export default function useAudioStream() {
 
   useEffect(() => {
     audioMutedRef.current = audioMuted;
-    if (audioMuted && ttsSourceRef.current) {
-      try { ttsSourceRef.current.stop(0); } catch (_) {}
-      ttsSourceRef.current = null;
+    if (audioMuted && isBrowser) {
+      window.speechSynthesis.cancel();
       setAuraSpeaking(false);
     }
   }, [audioMuted, setAuraSpeaking]);
 
-  // ── Teardown helper ────────────────────────────────────────────────────────
-  const stop = useCallback(() => {
+  const cleanupAudioSession = useCallback(({
+    stopRecognition = true,
+    cancelSpeech = false,
+    clearTranscript = false,
+  } = {}) => {
     try {
-      if (processorRef.current) {
-        try {
-          processorRef.current.disconnect();
-        } catch (_) {}
+      if (recognitionRef.current && stopRecognition) {
+        recognitionRef.current.onend = null;
+        recognitionRef.current.onerror = null;
+        recognitionRef.current.onresult = null;
+        try { recognitionRef.current.stop(); } catch (_) {}
+        recognitionRef.current = null;
       }
 
       if (analyserRef.current) {
-        try {
-          analyserRef.current.disconnect();
-        } catch (_) {}
+        try { analyserRef.current.disconnect(); } catch (_) {}
       }
 
       if (streamRef.current) {
@@ -90,41 +64,121 @@ export default function useAudioStream() {
         audioCtxRef.current.close().catch(() => {});
       }
 
-      if (wsRef.current && (
-        wsRef.current.readyState === WebSocket.OPEN ||
-        wsRef.current.readyState === WebSocket.CONNECTING
-      )) {
-        try {
-          wsRef.current.onclose = null;
-          wsRef.current.onerror = null;
-          wsRef.current.onmessage = null;
-          wsRef.current.close();
-        } catch (_) {}
-      }
-
       if (animFrameRef.current) {
         cancelAnimationFrame(animFrameRef.current);
       }
 
-      if (ttsSourceRef.current) {
-        try {
-          ttsSourceRef.current.stop(0);
-        } catch (_) {}
+      if (isBrowser && cancelSpeech) {
+        window.speechSynthesis.cancel();
       }
     } finally {
-      processorRef.current = null;
       analyserRef.current = null;
       streamRef.current = null;
       audioCtxRef.current = null;
-      wsRef.current = null;
       animFrameRef.current = null;
-      ttsSourceRef.current = null;
-      setAuraSpeaking(false);
+      sessionActiveRef.current = false;
       setListening(false);
+      volumeHistoryRef.current = [];
+      if (clearTranscript) {
+        latestTranscriptRef.current = '';
+      }
     }
   }, [setListening, setAuraSpeaking]);
 
-  // ── Draw visualizer on canvas ──────────────────────────────────────────────
+  const speakGroundingResponse = useCallback((groundingResponse) => {
+    if (!isBrowser || audioMutedRef.current || !groundingResponse) return;
+
+    window.speechSynthesis.cancel();
+    setAuraSpeaking(true);
+    const utterance = new SpeechSynthesisUtterance(groundingResponse);
+
+    const voices = window.speechSynthesis.getVoices();
+    const preferredVoice =
+      voices.find((v) => v.name.includes('Google US English'))
+      || voices.find((v) => v.lang === 'en-US')
+      || voices[0];
+    if (preferredVoice) utterance.voice = preferredVoice;
+
+    utterance.rate = 0.95;
+    utterance.pitch = 0.9;
+    utterance.onend = () => setAuraSpeaking(false);
+    utterance.onerror = () => setAuraSpeaking(false);
+
+    window.speechSynthesis.speak(utterance);
+  }, [setAuraSpeaking]);
+
+  const processTranscript = useCallback(async (rawText) => {
+    const text = String(rawText || '').trim();
+    if (processingRef.current) return;
+
+    if (!text) {
+      cleanupAudioSession({ cancelSpeech: false, clearTranscript: true });
+      return;
+    }
+
+    processingRef.current = true;
+    setListening(false);
+
+    const durationMinutes = (Date.now() - (transcriptStartTimeRef.current || Date.now())) / 60000;
+    const wordCount = text.split(/\s+/).filter(Boolean).length;
+    const wpm = durationMinutes > 0 ? Math.round(wordCount / durationMinutes) : 0;
+
+    const vols = volumeHistoryRef.current;
+    const averageVolume = vols.length ? vols.reduce((a, b) => a + b, 0) / vols.length : 0;
+
+    try {
+      const json = await clinicalApi.voiceTriage(text, wpm, averageVolume);
+
+      if (!json?.success || !json.data) {
+        throw new Error(json?.error || json?.message || 'Voice triage failed.');
+      }
+
+      const { stressTier, groundingResponse } = json.data;
+
+      let mappedEmotion = 'calm';
+      if (stressTier === 'ELEVATED') mappedEmotion = 'mild_anxiety';
+      else if (stressTier === 'PANIC_FREEZE') mappedEmotion = 'high_anxiety';
+
+      setAuraEmotion(mappedEmotion);
+      setAuraResponse(groundingResponse);
+      speakGroundingResponse(groundingResponse);
+    } catch (e) {
+      console.error('[VoiceTriage] Error fetching response:', e);
+      const fallbackResponse = 'I heard you. Let us pause for one slow breath, then choose the smallest next step.';
+      setAuraEmotion('mild_anxiety');
+      setAuraResponse(fallbackResponse);
+      speakGroundingResponse(fallbackResponse);
+    } finally {
+      processingRef.current = false;
+      cleanupAudioSession({ stopRecognition: false, cancelSpeech: false, clearTranscript: false });
+    }
+  }, [
+    cleanupAudioSession,
+    setListening,
+    setAuraEmotion,
+    setAuraResponse,
+    speakGroundingResponse,
+  ]);
+
+  const stop = useCallback(() => {
+    const text = latestTranscriptRef.current.trim();
+
+    if (text && !processingRef.current) {
+      if (recognitionRef.current) {
+        recognitionRef.current.onend = null;
+        recognitionRef.current.onerror = null;
+        recognitionRef.current.onresult = null;
+        try { recognitionRef.current.stop(); } catch (_) {}
+        recognitionRef.current = null;
+      }
+      void processTranscript(text);
+      return;
+    }
+
+    cleanupAudioSession({ cancelSpeech: true, clearTranscript: true });
+    setAuraSpeaking(false);
+  }, [cleanupAudioSession, processTranscript, setAuraSpeaking]);
+
   const drawVisualizer = useCallback((canvas, analyser) => {
     if (!canvas || !analyser) return;
 
@@ -137,6 +191,15 @@ export default function useAudioStream() {
     const draw = () => {
       animFrameRef.current = requestAnimationFrame(draw);
       analyser.getByteFrequencyData(dataArray);
+      
+      // Calculate average volume for telemetry
+      let sum = 0;
+      for (let i = 0; i < bufferLength; i++) sum += dataArray[i];
+      const avgVolume = sum / bufferLength;
+      volumeHistoryRef.current.push(avgVolume);
+      if (volumeHistoryRef.current.length > 200) {
+        volumeHistoryRef.current.shift(); // Keep recent history
+      }
 
       const { width, height } = canvas;
       ctx.clearRect(0, 0, width, height);
@@ -181,37 +244,42 @@ export default function useAudioStream() {
           ctx.quadraticCurveTo(x, y, x + radius, y);
           ctx.closePath();
         }
-
         ctx.fill();
       }
-
       ctx.globalAlpha = 1;
     };
-
     draw();
   }, []);
 
-  // ── Start listening ────────────────────────────────────────────────────────
   const start = useCallback(
     async (visualizerCanvas) => {
       try {
-        const wsUrl = resolveWsUrl(userId);
-        if (!isBrowser || !wsUrl) {
-          throw new Error('Audio stream can only start in a browser environment.');
-        }
+        if (!isBrowser) throw new Error('Audio stream can only start in a browser environment.');
 
         if (!navigator.mediaDevices?.getUserMedia) {
           throw new Error('Microphone access is not supported in this browser.');
         }
 
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+          throw new Error('Speech Recognition is not supported in this browser. Please use Chrome or Edge.');
+        }
+
+        // Cancel any ongoing speech
+        window.speechSynthesis.cancel();
+        
+        setAuraTranscript('');
+        setAuraResponse('');
+        setAuraEmotion('calm');
+        volumeHistoryRef.current = [];
+        latestTranscriptRef.current = '';
+        processingRef.current = false;
+        sessionActiveRef.current = true;
+
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         streamRef.current = stream;
 
         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-        if (!AudioContextClass) {
-          throw new Error('Web Audio API is not supported in this browser.');
-        }
-
         const audioCtx = new AudioContextClass({ sampleRate: SAMPLE_RATE });
         audioCtxRef.current = audioCtx;
 
@@ -221,125 +289,79 @@ export default function useAudioStream() {
         analyser.smoothingTimeConstant = 0.8;
         analyserRef.current = analyser;
 
-        // Wire up visualizer
         source.connect(analyser);
         drawVisualizer(visualizerCanvas, analyser);
 
-        // ScriptProcessor chunks audio for WebSocket transmission
-        const processor = audioCtx.createScriptProcessor(BUFFER_SIZE, 1, 1);
-        processorRef.current = processor;
-        source.connect(processor);
+        // ── Speech Recognition Setup ──
+        const recognition = new SpeechRecognition();
+        recognitionRef.current = recognition;
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = 'en-US';
 
-        // Keep processor alive without loud audio output
-        const silentGain = audioCtx.createGain();
-        silentGain.gain.value = 0;
-        processor.connect(silentGain);
-        silentGain.connect(audioCtx.destination);
+        let finalTranscriptStr = '';
 
-        // ── WebSocket connection ──────────────────────────────────────────────
-        const ws = new WebSocket(wsUrl);
-        wsRef.current = ws;
-        ws.binaryType = 'arraybuffer';
-
-        ws.onopen = () => {
-          console.log('[WS] Connected to Python audio backend');
+        recognition.onstart = () => {
           setListening(true);
+          transcriptStartTimeRef.current = Date.now();
         };
 
-        ws.onmessage = async (event) => {
-          try {
-            const msg = JSON.parse(event.data);
+        recognition.onresult = (event) => {
+          let interimTranscript = '';
+          finalTranscriptStr = '';
 
-            switch (msg.type) {
-              case 'transcript':
-                setAuraTranscript(msg.text || '');
-                break;
-
-              case 'response':
-                setAuraResponse(msg.text || '');
-                if (msg.emotion) setAuraEmotion(msg.emotion);
-
-                if (typeof msg.tts_audio === 'string' && msg.tts_audio && audioCtxRef.current && !audioMutedRef.current) {
-                  try {
-                    if (ttsSourceRef.current) {
-                      try { ttsSourceRef.current.stop(0); } catch (_) {}
-                      ttsSourceRef.current = null;
-                    }
-
-                    const binary = atob(msg.tts_audio);
-                    const bytes = new Uint8Array(binary.length);
-                    for (let i = 0; i < binary.length; i++) {
-                      bytes[i] = binary.charCodeAt(i);
-                    }
-
-                    const audioBuffer = await audioCtxRef.current.decodeAudioData(
-                      bytes.buffer
-                    );
-                    const ttsSource = audioCtxRef.current.createBufferSource();
-                    ttsSource.buffer = audioBuffer;
-                    ttsSource.connect(audioCtxRef.current.destination);
-                    ttsSource.onended = () => {
-                      if (ttsSourceRef.current === ttsSource) ttsSourceRef.current = null;
-                      setAuraSpeaking(false);
-                    };
-                    ttsSourceRef.current = ttsSource;
-                    setAuraSpeaking(true);
-                    ttsSource.start();
-                  } catch (e) {
-                    setAuraSpeaking(false);
-                    console.warn('[WS] TTS playback failed:', e?.message || e);
-                  }
-                }
-                break;
-
-              case 'emotion_update':
-                setAuraEmotion(msg.emotion || '');
-                break;
-
-              default:
-                break;
+          for (let i = 0; i < event.results.length; i++) {
+            const transcript = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+              finalTranscriptStr += transcript + ' ';
+            } else {
+              interimTranscript += transcript;
             }
-          } catch (e) {
-            console.warn('[WS] Invalid message received:', e);
           }
+
+          const visibleTranscript = (finalTranscriptStr + interimTranscript).trim();
+          latestTranscriptRef.current = visibleTranscript;
+          setAuraTranscript(visibleTranscript);
         };
 
-        ws.onerror = () => {
-          console.error(
-            '[WS] Could not connect to the voice backend. Is the Python service running on :8000?'
-          );
-          stop();
+        recognition.onerror = (event) => {
+          console.error('[SpeechRecognition] error:', event.error);
         };
 
-        ws.onclose = () => {
-          console.log('[WS] Disconnected');
-          stop();
+        recognition.onend = async () => {
+          if (!sessionActiveRef.current || processingRef.current) return;
+          
+          const text = latestTranscriptRef.current.trim() || finalTranscriptStr.trim();
+          if (!text) {
+             // If nothing was said, just restart listening to behave continuously until stopped
+             try {
+               if (streamRef.current && sessionActiveRef.current) recognition.start();
+             } catch (e) {}
+             return;
+          }
+
+          await processTranscript(text);
         };
 
-        processor.onaudioprocess = (event) => {
-          if (ws.readyState !== WebSocket.OPEN) return;
-          const float32 = event.inputBuffer.getChannelData(0);
-          ws.send(float32.buffer);
-        };
+        recognition.start();
+
       } catch (err) {
         console.error('[AudioStream] Failed to start:', err);
-        stop();
+        cleanupAudioSession({ cancelSpeech: true, clearTranscript: true });
         throw err;
       }
     },
     [
       drawVisualizer,
-      stop,
+      cleanupAudioSession,
+      processTranscript,
       setListening,
       setAuraEmotion,
       setAuraTranscript,
       setAuraResponse,
-      setAuraSpeaking,
-      userId,
     ]
   );
 
-  // Cleanup on unmount
   useEffect(() => () => stop(), [stop]);
 
   return { start, stop, analyserRef };

@@ -3,11 +3,12 @@
 //
 // Routes:
 //   POST /api/clinical/trigger-alert    — Panic trigger from TaskShatter
-//   POST /api/clinical/vocal-stress     — Logged by Python backend after each session
+//   POST /api/clinical/vocal-stress     — Logged after each session
 //   POST /api/clinical/guardian         — Set / update guardian contact
 //   GET  /api/clinical/dashboard/:userId— Aggregated recharts-ready data
 //   POST /api/clinical/therapy-brief    — Generate 14-day clinical PDF brief
 
+import mongoose    from 'mongoose';
 import UserState   from '../models/UserState.js';
 import Patient     from '../models/Patient.js';
 import Guardian    from '../models/Guardian.js';
@@ -25,6 +26,26 @@ import { AppError }              from '../middleware/errorHandler.js';
 const localMemoryReports = new Map();
 
 const toSafeString = (v, max = 300) => String(v || '').trim().slice(0, max);
+
+const generateRecoveryProtocol = async (telemetry = {}) => {
+  const arousal = Number(telemetry.vocalArousal || telemetry.vocalArousalScore || telemetry.arousalScore || 5);
+  const isHighArousal = arousal >= 7 || telemetry.emotion === 'high_anxiety';
+  const taskSummary = toSafeString(telemetry.taskSummary || telemetry.currentTask || 'current recovery context', 160);
+
+  return {
+    diagnosis_baseline: isHighArousal
+      ? `Elevated nervous-system load detected around ${taskSummary}.`
+      : `Stabilizing recovery support for ${taskSummary}.`,
+    neuro_diet_plan: isHighArousal
+      ? ['Hydrate first.', 'Choose a magnesium-rich snack if available.', 'Avoid extra caffeine until arousal lowers.']
+      : ['Hydrate steadily.', 'Choose a protein-forward snack.', 'Keep caffeine moderate and paired with food.'],
+    somatic_exercise_plan: isHighArousal
+      ? 'Do 60 seconds of slow exhale breathing, then press both feet into the floor for sensory grounding.'
+      : 'Take a two-minute low-friction walk or stretch to reset attention.',
+    confidence_anchor: 'The next useful step can be smaller than the anxiety wants it to be.',
+    medical_disclaimer: 'AuraOS is supportive software, not a medical diagnosis or emergency service.',
+  };
+};
 
 const normalizeWorryBlocks = (payloadBlocks = [], dbWorries = []) => {
   const fromPayload = Array.isArray(payloadBlocks)
@@ -294,7 +315,7 @@ export const triggerAlertHandler = async (req, res, next) => {
 };
 
 // ── POST /api/clinical/vocal-stress ──────────────────────────────────────────
-// Called by Python backend (or Node proxy) after each Aura Voice session.
+// Called after each Aura Voice session.
 export const logVocalStressHandler = async (req, res, next) => {
   try {
     const { userId, emotion, arousalScore, taskContext } = req.body;
@@ -842,17 +863,44 @@ export const generateSessionReportHandler = async (req, res, next) => {
       },
     };
 
-    const downloadUrl = buildPublicReportUrl(req, report._id.toString());
+    let report;
+    if (mongoose.connection.readyState === 1) {
+      try {
+        report = await ClinicalReport.create(draftReport);
+      } catch (dbErr) {
+        console.warn('[Clinical] ClinicalReport.create failed, using local memory report:', dbErr.message);
+      }
+    }
+
+    if (!report) {
+      const localId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      report = {
+        _id: localId,
+        ...draftReport,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        toObject() {
+          const { toObject, save, ...plain } = this;
+          return plain;
+        },
+      };
+      localMemoryReports.set(localId, report.toObject());
+    }
+
+    const reportId = report._id.toString();
+    const downloadUrl = buildPublicReportUrl(req, reportId);
     // Fetch recent mood logs to include in PDF
     let patientMood = null;
-    if (report.patientId) {
-      patientMood = await ClientUserModel.findById(report.patientId).select('dailyMoodLogs').lean() || await Patient.findById(report.patientId).select('dailyMoodLogs').lean();
-    } else {
-      if (mongoose.Types.ObjectId.isValid(report.userId)) {
-        patientMood = await ClientUserModel.findById(report.userId).select('dailyMoodLogs').lean();
-      }
-      if (!patientMood) {
-        patientMood = await Patient.findOne({ userStateId: report.userId }).select('dailyMoodLogs').lean();
+    if (mongoose.connection.readyState === 1) {
+      if (report.patientId) {
+        patientMood = await ClientUserModel.findById(report.patientId).select('dailyMoodLogs').lean() || await Patient.findById(report.patientId).select('dailyMoodLogs').lean();
+      } else {
+        if (mongoose.Types.ObjectId.isValid(report.userId)) {
+          patientMood = await ClientUserModel.findById(report.userId).select('dailyMoodLogs').lean();
+        }
+        if (!patientMood) {
+          patientMood = await Patient.findOne({ userStateId: report.userId }).select('dailyMoodLogs').lean();
+        }
       }
     }
     const moodLogsForPdf = (patientMood?.dailyMoodLogs || [])
@@ -860,7 +908,8 @@ export const generateSessionReportHandler = async (req, res, next) => {
       .slice(0, 14)
       .reverse()
       .map((l) => ({ day: new Date(l.loggedAt).toISOString().slice(0, 10), battery: l.battery, brainFog: l.brainFog, anxiety: l.anxiety, energy: l.energy, sociability: l.sociability }));
-    const pdfBuffer = await buildClinicalReportPdfBuffer(report.toObject(), moodLogsForPdf);
+    const reportForPdf = typeof report.toObject === 'function' ? report.toObject() : report;
+    const pdfBuffer = await buildClinicalReportPdfBuffer(reportForPdf, moodLogsForPdf);
 
     let whatsappResult = { skipped: true, channel: 'whatsapp' };
     let emailResult = { skipped: true, channel: 'email' };
@@ -874,7 +923,7 @@ export const generateSessionReportHandler = async (req, res, next) => {
 
       const mediaBase = process.env.TWILIO_MEDIA_PUBLIC_BASE_URL || process.env.REPORT_PUBLIC_BASE_URL || null;
       const mediaUrl = mediaBase
-        ? `${mediaBase.replace(/\/$/, '')}/api/clinical/session-report/${report._id}/pdf`
+        ? `${mediaBase.replace(/\/$/, '')}/api/clinical/session-report/${reportId}/pdf`
         : null;
 
       const [waSettled, emailSettled] = await Promise.allSettled([
@@ -893,7 +942,7 @@ export const generateSessionReportHandler = async (req, res, next) => {
               guardianName: report.guardian?.name,
               userId,
               riskLevel: report.riskLevel,
-              reportId: report._id,
+              reportId,
               summary: report.aiStressSummary,
               downloadUrl,
               pdfBuffer,
@@ -909,25 +958,31 @@ export const generateSessionReportHandler = async (req, res, next) => {
         ? emailSettled.value
         : { success: false, channel: 'email', error: emailSettled.reason?.message || 'Email dispatch failed' };
 
-      await AlertLog.create({
-        userId,
-        guardianPhone: report.guardian?.phone || null,
-        guardianEmail: report.guardian?.email || null,
-        channel: whatsappResult.mock ? 'mock' : (whatsappResult.success ? 'whatsapp' : (emailResult.success ? 'email' : 'mock')),
-        riskLevel: report.riskLevel,
-        triggerReason: `${report.selectedBlocker || 'stress'} during "${report.currentTask || 'session'}"`,
-        briefText: [brief.executive_summary, brief.actionable_protocol].join('\n\n').slice(0, 3000),
-        deliveryStatus: whatsappResult.success || emailResult.success
-          ? (whatsappResult.mock && emailResult.mock ? 'mock' : 'sent')
-          : 'failed',
-        twilioSid: whatsappResult.sid || null,
-      });
+      if (mongoose.connection.readyState === 1) {
+        await AlertLog.create({
+          userId,
+          guardianPhone: report.guardian?.phone || null,
+          guardianEmail: report.guardian?.email || null,
+          channel: whatsappResult.mock ? 'mock' : (whatsappResult.success ? 'whatsapp' : (emailResult.success ? 'email' : 'mock')),
+          riskLevel: report.riskLevel,
+          triggerReason: `${report.selectedBlocker || 'stress'} during "${report.currentTask || 'session'}"`,
+          briefText: [brief.executive_summary, brief.actionable_protocol].join('\n\n').slice(0, 3000),
+          deliveryStatus: whatsappResult.success || emailResult.success
+            ? (whatsappResult.mock && emailResult.mock ? 'mock' : 'sent')
+            : 'failed',
+          twilioSid: whatsappResult.sid || null,
+        });
+      }
     }
 
     report.delivery = {
       whatsapp: deliveryStatusFromResult(whatsappResult),
       email: deliveryStatusFromResult(emailResult),
     };
+
+    if (String(reportId).startsWith('local-')) {
+      localMemoryReports.set(reportId, typeof report.toObject === 'function' ? report.toObject() : report);
+    }
     
     try {
       if (typeof report.save === 'function') {
@@ -939,7 +994,7 @@ export const generateSessionReportHandler = async (req, res, next) => {
 
     res.json({
       success: true,
-      reportId: report._id,
+      reportId,
       riskLevel: report.riskLevel,
       aiStressSummary: report.aiStressSummary,
       downloadUrl,
