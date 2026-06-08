@@ -94,13 +94,17 @@ export default function useAudioStream() {
 
     const voices = window.speechSynthesis.getVoices();
     const preferredVoice =
-      voices.find((v) => v.name.includes('Google US English'))
+      voices.find((v) => v.name.includes('Google UK English Female'))
+      || voices.find((v) => v.name.includes('Samantha'))
+      || voices.find((v) => v.name.includes('Karen'))
+      || voices.find((v) => v.name.includes('Zira'))
+      || voices.find((v) => v.lang === 'en-US' && v.name.includes('Female'))
       || voices.find((v) => v.lang === 'en-US')
       || voices[0];
     if (preferredVoice) utterance.voice = preferredVoice;
 
-    utterance.rate = 0.95;
-    utterance.pitch = 0.9;
+    utterance.rate = 1.05;
+    utterance.pitch = 1.35;
     utterance.onend = () => setAuraSpeaking(false);
     utterance.onerror = () => setAuraSpeaking(false);
 
@@ -127,7 +131,7 @@ export default function useAudioStream() {
     const averageVolume = vols.length ? vols.reduce((a, b) => a + b, 0) / vols.length : 0;
 
     try {
-      const json = await clinicalApi.voiceTriage(text, wpm, averageVolume);
+      const json = await clinicalApi.voiceTriage(userId, text, wpm, averageVolume);
 
       if (!json?.success || !json.data) {
         throw new Error(json?.error || json?.message || 'Voice triage failed.');
@@ -162,6 +166,7 @@ export default function useAudioStream() {
 
   const stop = useCallback(() => {
     const text = latestTranscriptRef.current.trim();
+    sessionActiveRef.current = false;
 
     if (text && !processingRef.current) {
       if (recognitionRef.current) {
@@ -308,15 +313,19 @@ export default function useAudioStream() {
 
         recognition.onresult = (event) => {
           let interimTranscript = '';
-          finalTranscriptStr = '';
+          let newFinal = '';
 
-          for (let i = 0; i < event.results.length; i++) {
+          for (let i = event.resultIndex; i < event.results.length; i++) {
             const transcript = event.results[i][0].transcript;
             if (event.results[i].isFinal) {
-              finalTranscriptStr += transcript + ' ';
+              newFinal += transcript + ' ';
             } else {
               interimTranscript += transcript;
             }
+          }
+
+          if (newFinal) {
+            finalTranscriptStr += newFinal;
           }
 
           const visibleTranscript = (finalTranscriptStr + interimTranscript).trim();
@@ -326,21 +335,31 @@ export default function useAudioStream() {
 
         recognition.onerror = (event) => {
           console.error('[SpeechRecognition] error:', event.error);
+          if (event.error === 'not-allowed') {
+            setAuraTranscript('[Microphone access denied. Please check browser permissions.]');
+            sessionActiveRef.current = false;
+          } else if (event.error === 'network') {
+            setAuraTranscript('[Network error. Web Speech API requires an internet connection.]');
+            sessionActiveRef.current = false;
+          }
         };
 
-        recognition.onend = async () => {
+        recognition.onend = () => {
+          // Do not process on end, just silently restart to keep the session alive
+          // until the user explicitly calls stop().
           if (!sessionActiveRef.current || processingRef.current) return;
           
-          const text = latestTranscriptRef.current.trim() || finalTranscriptStr.trim();
-          if (!text) {
-             // If nothing was said, just restart listening to behave continuously until stopped
-             try {
-               if (streamRef.current && sessionActiveRef.current) recognition.start();
-             } catch (e) {}
-             return;
-          }
-
-          await processTranscript(text);
+          // IMPORTANT: A small delay is strictly required by Chrome before restarting 
+          // to prevent an InvalidStateError that permanently kills the speech engine!
+          setTimeout(() => {
+            try {
+              if (streamRef.current && sessionActiveRef.current) {
+                recognition.start();
+              }
+            } catch (e) {
+              console.error('[SpeechRecognition] Failed to restart:', e);
+            }
+          }, 350);
         };
 
         recognition.start();

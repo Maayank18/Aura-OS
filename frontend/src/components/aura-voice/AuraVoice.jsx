@@ -112,8 +112,7 @@ export default function AuraVoice() {
   const pulseMult   = isListening ? 0.5 : 1;
 
   return (
-    <div className="page fade-up"
-      style={{maxWidth:680,display:'flex',flexDirection:'column',alignItems:'center',paddingTop:20}}>
+    <div className="page fade-up w-full max-w-5xl mx-auto px-6 py-8">
 
       {/* Header */}
       <div style={{textAlign:'center',marginBottom:40}}>
@@ -160,217 +159,223 @@ export default function AuraVoice() {
         </div>
       </div>
 
-      {/* ═══════════════ LIVING CIRCUIT ORB ═══════════════ */}
-      <motion.div 
-        animate={{ y: [-6, 6, -6], rotate: [-0.5, 0.5, -0.5] }} 
-        transition={{ repeat: Infinity, duration: 8, ease: 'easeInOut' }}
-        style={{
-        position:'relative',
-        width:'min(360px,88vw)', height:'min(360px,88vw)',
-        flexShrink:0, marginBottom:36,
-        borderRadius:'50%', overflow:'hidden',
-        background:'radial-gradient(circle at 45% 42%, rgba(0,40,70,0.6) 0%, rgba(0,20,40,0.3) 40%, transparent 75%)',
-        boxShadow: `0 20px 50px rgba(0,0,0,0.5), inset -20px -30px 60px rgba(0,0,0,0.7), inset 0 0 60px ${G.replace(/[\d.]+\)$/,'0.2)')}, inset 10px 15px 30px rgba(255,255,255,0.07)`,
-        backdropFilter: 'blur(12px)',
-        border: `1px solid ${C}20`,
-      }}>
-        {/* Layer 1: Static PCB traces */}
-        <svg viewBox="0 0 380 380" aria-hidden="true"
-          style={{position:'absolute',inset:0,width:'100%',height:'100%',pointerEvents:'none'}}>
-          {TRACES.map((d,i) => <path key={`s${i}`} d={d} stroke="#0088aa" strokeWidth="0.8" fill="none" opacity="0.35"/>)}
-          {PADS.map(([x,y],i) => <rect key={`p${i}`} x={x-2} y={y-2} width="4" height="4" rx="0.5" fill="#00ccee" opacity="0.5"/>)}
-          {CARDINAL_NODES.map(([cx,cy],i) => <circle key={`n${i}`} cx={cx} cy={cy} r="4.5" fill="none" stroke="#00e5ff" strokeWidth="1.3" opacity="0.65"/>)}
-        </svg>
+      <div className="flex flex-col md:flex-row gap-12 items-start justify-center w-full">
+        {/* Left Column: Orb */}
+        <div className="flex-1 flex flex-col items-center w-full max-w-sm mx-auto">
+          {/* ═══════════════ LIVING CIRCUIT ORB ═══════════════ */}
+          <motion.div 
+            animate={{ y: [-6, 6, -6], rotate: [-0.5, 0.5, -0.5] }} 
+            transition={{ repeat: Infinity, duration: 8, ease: 'easeInOut' }}
+            style={{
+            position:'relative',
+            width:'min(360px,88vw)', height:'min(360px,88vw)',
+            flexShrink:0, marginBottom:36,
+            borderRadius:'50%', overflow:'hidden',
+            background:'radial-gradient(circle at 45% 42%, rgba(0,40,70,0.6) 0%, rgba(0,20,40,0.3) 40%, transparent 75%)',
+            boxShadow: `0 20px 50px rgba(0,0,0,0.5), inset -20px -30px 60px rgba(0,0,0,0.7), inset 0 0 60px ${G.replace(/[\d.]+\)$/,'0.2)')}, inset 10px 15px 30px rgba(255,255,255,0.07)`,
+            backdropFilter: 'blur(12px)',
+            border: `1px solid ${C}20`,
+          }}>
+            {/* Layer 1: Static PCB traces */}
+            <svg viewBox="0 0 380 380" aria-hidden="true"
+              style={{position:'absolute',inset:0,width:'100%',height:'100%',pointerEvents:'none'}}>
+              {TRACES.map((d,i) => <path key={`s${i}`} d={d} stroke="#0088aa" strokeWidth="0.8" fill="none" opacity="0.35"/>)}
+              {PADS.map(([x,y],i) => <rect key={`p${i}`} x={x-2} y={y-2} width="4" height="4" rx="0.5" fill="#00ccee" opacity="0.5"/>)}
+              {CARDINAL_NODES.map(([cx,cy],i) => <circle key={`n${i}`} cx={cx} cy={cy} r="4.5" fill="none" stroke="#00e5ff" strokeWidth="1.3" opacity="0.65"/>)}
+            </svg>
 
-        {/* Layer 2: Electric pulses racing along traces */}
-        <svg viewBox="0 0 380 380" aria-hidden="true"
-          style={{position:'absolute',inset:0,width:'100%',height:'100%',pointerEvents:'none'}}>
-          {TRACES.map((d,i) => {
-            const cls = PULSE_A.includes(i)?'trace-pulse':PULSE_B.includes(i)?'trace-pulse-b':PULSE_C.includes(i)?'trace-pulse-c':null;
-            if (!cls) return null;
-            const delay = (PULSE_DELAYS[i%PULSE_DELAYS.length]*pulseMult).toFixed(2);
-            return <path key={`el${i}`} d={d} stroke={C} strokeWidth="1.6" fill="none" className={cls} style={{animationDelay:`${delay}s`}}/>;
-          })}
-        </svg>
+            {/* Layer 2: Electric pulses racing along traces */}
+            <svg viewBox="0 0 380 380" aria-hidden="true"
+              style={{position:'absolute',inset:0,width:'100%',height:'100%',pointerEvents:'none'}}>
+              {TRACES.map((d,i) => {
+                const cls = PULSE_A.includes(i)?'trace-pulse':PULSE_B.includes(i)?'trace-pulse-b':PULSE_C.includes(i)?'trace-pulse-c':null;
+                if (!cls) return null;
+                const delay = (PULSE_DELAYS[i%PULSE_DELAYS.length]*pulseMult).toFixed(2);
+                return <path key={`el${i}`} d={d} stroke={C} strokeWidth="1.6" fill="none" className={cls} style={{animationDelay:`${delay}s`}}/>;
+              })}
+            </svg>
 
-        {/* Layer 3: Starfield */}
-        {STARS.map(([x,y,s,delay,dur],i) => (
-          <div key={`st${i}`} style={{
-            position:'absolute',left:`${x}%`,top:`${y}%`,
-            width:s,height:s,borderRadius:'50%',background:'#b2f0ff',
-            boxShadow:`0 0 ${s*2.5}px rgba(0,229,255,0.9)`,
-            animation:`starPulse ${dur}s ${delay}s ease-in-out infinite`,
-          }}/>
-        ))}
+            {/* Layer 3: Starfield */}
+            {STARS.map(([x,y,s,delay,dur],i) => (
+              <div key={`st${i}`} style={{
+                position:'absolute',left:`${x}%`,top:`${y}%`,
+                width:s,height:s,borderRadius:'50%',background:'#b2f0ff',
+                boxShadow:`0 0 ${s*2.5}px rgba(0,229,255,0.9)`,
+                animation:`starPulse ${dur}s ${delay}s ease-in-out infinite`,
+              }}/>
+            ))}
 
-        {/* Layer 4: Dual counter-rotating atmosphere halos */}
-        <div style={{
-          position:'absolute',left:'50%',top:'50%',
-          width:'114%',height:'114%',marginLeft:'-57%',marginTop:'-57%',
-          borderRadius:'50%',pointerEvents:'none',
-          background:`conic-gradient(transparent 0%,transparent 58%,${G.replace(/[\d.]+\)$/,'0.22)')} 72%,${G.replace(/[\d.]+\)$/,'0.08)')} 80%,transparent 90%,${G.replace(/[\d.]+\)$/,'0.04)')} 96%,transparent 100%)`,
-          animation:'haloSpin 16s linear infinite',transition:'background 0.6s',
-        }}/>
-        <div style={{
-          position:'absolute',left:'50%',top:'50%',
-          width:'108%',height:'108%',marginLeft:'-54%',marginTop:'-54%',
-          borderRadius:'50%',pointerEvents:'none',
-          background:`conic-gradient(transparent 0%,transparent 68%,${G.replace(/[\d.]+\)$/,'0.14)')} 78%,transparent 90%,${G.replace(/[\d.]+\)$/,'0.07)')} 95%,transparent 100%)`,
-          animation:'haloSpinR 24s linear infinite',
-        }}/>
+            {/* Layer 4: Dual counter-rotating atmosphere halos */}
+            <div style={{
+              position:'absolute',left:'50%',top:'50%',
+              width:'114%',height:'114%',marginLeft:'-57%',marginTop:'-57%',
+              borderRadius:'50%',pointerEvents:'none',
+              background:`conic-gradient(transparent 0%,transparent 58%,${G.replace(/[\d.]+\)$/,'0.22)')} 72%,${G.replace(/[\d.]+\)$/,'0.08)')} 80%,transparent 90%,${G.replace(/[\d.]+\)$/,'0.04)')} 96%,transparent 100%)`,
+              animation:'haloSpin 16s linear infinite',transition:'background 0.6s',
+            }}/>
+            <div style={{
+              position:'absolute',left:'50%',top:'50%',
+              width:'108%',height:'108%',marginLeft:'-54%',marginTop:'-54%',
+              borderRadius:'50%',pointerEvents:'none',
+              background:`conic-gradient(transparent 0%,transparent 68%,${G.replace(/[\d.]+\)$/,'0.14)')} 78%,transparent 90%,${G.replace(/[\d.]+\)$/,'0.07)')} 95%,transparent 100%)`,
+              animation:'haloSpinR 24s linear infinite',
+            }}/>
 
-        {/* Layer 5: Outer faint decorative ring */}
-        <div style={{position:'absolute',inset:'8%',borderRadius:'50%',border:'1px solid rgba(0,229,255,0.07)',pointerEvents:'none'}}/>
+            {/* Layer 5: Outer faint decorative ring */}
+            <div style={{position:'absolute',inset:'8%',borderRadius:'50%',border:'1px solid rgba(0,229,255,0.07)',pointerEvents:'none'}}/>
 
-        {/* Layer 6: MAIN NEON RING — THE HERO */}
-        <motion.div
-          style={{
-            position:'absolute',inset:'14%',borderRadius:'50%',
-            border:`2.5px solid ${C}`,
-            boxShadow:neonShadow,
-            transition:'border-color 0.5s, box-shadow 0.5s',
-          }}
-          animate={{scale: isListening ? [1,1.042,1] : [1,1.018,1]}}
-          transition={{duration:isListening ? 0.9 : 4.5, repeat:Infinity, ease:'easeInOut'}}
-        />
+            {/* Layer 6: MAIN NEON RING — THE HERO */}
+            <motion.div
+              style={{
+                position:'absolute',inset:'14%',borderRadius:'50%',
+                border:`2.5px solid ${C}`,
+                boxShadow:neonShadow,
+                transition:'border-color 0.5s, box-shadow 0.5s',
+              }}
+              animate={{scale: isListening ? [1,1.042,1] : [1,1.018,1]}}
+              transition={{duration:isListening ? 0.9 : 4.5, repeat:Infinity, ease:'easeInOut'}}
+            />
 
-        {/* Layer 7: Animated comets on the ring circle */}
-        <svg viewBox="0 0 380 380" aria-hidden="true"
-          style={{position:'absolute',inset:0,width:'100%',height:'100%',pointerEvents:'none'}}>
-          <circle cx="190" cy="190" r="135" fill="none" stroke={C} strokeWidth="4"
-            className={cometClass} style={{filter:`drop-shadow(0 0 7px ${C}) drop-shadow(0 0 14px ${C})`}}/>
-          <circle cx="190" cy="190" r="135" fill="none" stroke={C} strokeWidth="1.5" opacity="0.4"
-            className={comet2Class}/>
-        </svg>
+            {/* Layer 7: Animated comets on the ring circle */}
+            <svg viewBox="0 0 380 380" aria-hidden="true"
+              style={{position:'absolute',inset:0,width:'100%',height:'100%',pointerEvents:'none'}}>
+              <circle cx="190" cy="190" r="135" fill="none" stroke={C} strokeWidth="4"
+                className={cometClass} style={{filter:`drop-shadow(0 0 7px ${C}) drop-shadow(0 0 14px ${C})`}}/>
+              <circle cx="190" cy="190" r="135" fill="none" stroke={C} strokeWidth="1.5" opacity="0.4"
+                className={comet2Class}/>
+            </svg>
 
-        {/* Layer 8: Expanding pulse rings when listening */}
-        {isListening && [0,0.5,1.0,1.5].map((delay) => (
-          <motion.div key={delay}
-            style={{position:'absolute',inset:'14%',borderRadius:'50%',border:`1px solid ${C}`,pointerEvents:'none'}}
-            animate={{scale:[1,1.75],opacity:[0.65,0]}}
-            transition={{duration:2.6,delay,repeat:Infinity,ease:'easeOut'}}
-          />
-        ))}
+            {/* Layer 8: Expanding pulse rings when listening */}
+            {isListening && [0,0.5,1.0,1.5].map((delay) => (
+              <motion.div key={delay}
+                style={{position:'absolute',inset:'14%',borderRadius:'50%',border:`1px solid ${C}`,pointerEvents:'none'}}
+                animate={{scale:[1,1.75],opacity:[0.65,0]}}
+                transition={{duration:2.6,delay,repeat:Infinity,ease:'easeOut'}}
+              />
+            ))}
 
-        {/* Layer 9: Inner decorative rings */}
-        <div style={{position:'absolute',inset:'23%',borderRadius:'50%',border:`0.7px solid ${C}30`,pointerEvents:'none'}}/>
-        <div style={{position:'absolute',inset:'31%',borderRadius:'50%',border:`0.5px solid ${C}18`,pointerEvents:'none'}}/>
+            {/* Layer 9: Inner decorative rings */}
+            <div style={{position:'absolute',inset:'23%',borderRadius:'50%',border:`0.7px solid ${C}30`,pointerEvents:'none'}}/>
+            <div style={{position:'absolute',inset:'31%',borderRadius:'50%',border:`0.5px solid ${C}18`,pointerEvents:'none'}}/>
 
-        {/* Layer 10: Cardinal glow nodes */}
-        {[
-          {top:'13.5%',left:'50%',transform:'translateX(-50%)'},
-          {bottom:'13.5%',left:'50%',transform:'translateX(-50%)'},
-          {top:'50%',left:'13.5%',transform:'translateY(-50%)'},
-          {top:'50%',right:'13.5%',transform:'translateY(-50%)'},
-        ].map((s,i) => (
-          <div key={i} style={{
-            position:'absolute',...s,
-            width:7,height:7,borderRadius:'50%',
-            background:C,
-            boxShadow:`0 0 10px ${C},0 0 22px ${C},0 0 40px ${C}`,
-          }}/>
-        ))}
+            {/* Layer 10: Cardinal glow nodes */}
+            {[
+              {top:'13.5%',left:'50%',transform:'translateX(-50%)'},
+              {bottom:'13.5%',left:'50%',transform:'translateX(-50%)'},
+              {top:'50%',left:'13.5%',transform:'translateY(-50%)'},
+              {top:'50%',right:'13.5%',transform:'translateY(-50%)'},
+            ].map((s,i) => (
+              <div key={i} style={{
+                position:'absolute',...s,
+                width:7,height:7,borderRadius:'50%',
+                background:C,
+                boxShadow:`0 0 10px ${C},0 0 22px ${C},0 0 40px ${C}`,
+              }}/>
+            ))}
 
-        {/* Layer 11: Center void + mic button */}
-        <div style={{
-          position:'absolute',inset:'33%',borderRadius:'50%',
-          background:'radial-gradient(circle at 42% 40%, #001929, #00060e)',
-          boxShadow:'inset 0 0 36px rgba(0,0,0,0.97), inset 0 0 14px rgba(0,20,40,0.9)',
-          animation:'voidBreathe 4s ease-in-out infinite',
-          display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',
-        }}>
-          <div style={{position:'absolute',inset:0,borderRadius:'50%',
-            background:`radial-gradient(circle at 38% 36%, ${C}1a, transparent 62%)`}}/>
-          <motion.button
-            onClick={toggleListening}
-            style={{position:'relative',border:'none',background:'transparent',cursor:'pointer',
-              display:'flex',alignItems:'center',justifyContent:'center',
-              width:'100%',height:'100%',borderRadius:'50%'}}
-            whileHover={{scale:1.12}}
-            whileTap={{scale:0.86}}
-            aria-label={isListening ? 'Stop' : 'Start listening'}
-          >
+            {/* Layer 11: Center void + mic button */}
+            <div style={{
+              position:'absolute',inset:'33%',borderRadius:'50%',
+              background:'radial-gradient(circle at 42% 40%, #001929, #00060e)',
+              boxShadow:'inset 0 0 36px rgba(0,0,0,0.97), inset 0 0 14px rgba(0,20,40,0.9)',
+              animation:'voidBreathe 4s ease-in-out infinite',
+              display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',
+            }}>
+              <div style={{position:'absolute',inset:0,borderRadius:'50%',
+                background:`radial-gradient(circle at 38% 36%, ${C}1a, transparent 62%)`}}/>
+              <motion.button
+                onClick={toggleListening}
+                style={{position:'relative',border:'none',background:'transparent',cursor:'pointer',
+                  display:'flex',alignItems:'center',justifyContent:'center',
+                  width:'100%',height:'100%',borderRadius:'50%'}}
+                whileHover={{scale:1.12}}
+                whileTap={{scale:0.86}}
+                aria-label={isListening ? 'Stop' : 'Start listening'}
+              >
+                {isListening
+                  ? <MicOff size={22} color={C} strokeWidth={1.5} style={{filter:`drop-shadow(0 0 10px ${C})`}}/>
+                  : <Mic    size={22} color="#00e5ff" strokeWidth={1.5} style={{filter:'drop-shadow(0 0 10px #00e5ff)'}}/>
+                }
+              </motion.button>
+            </div>
+
+            {/* Layer 12: 3D Glass Specular Highlight */}
+            <div style={{
+              position: 'absolute', top: '3%', left: '14%', width: '72%', height: '28%',
+              borderRadius: '50% 50% 30% 30%', pointerEvents: 'none',
+              background: 'linear-gradient(to bottom, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.02) 65%, transparent 100%)',
+              transform: 'rotate(-10deg)',
+              filter: 'blur(1.5px)',
+            }}/>
+          </motion.div>
+          {/* ═════════════ END ORB ═════════════ */}
+
+          {/* Status */}
+          <motion.p key={String(isListening)} initial={{opacity:0}} animate={{opacity:1}}
+            style={{fontSize:13,color:'var(--text-3)',fontWeight:500,letterSpacing:'0.04em',marginBottom:28}}>
             {isListening
-              ? <MicOff size={22} color={C} strokeWidth={1.5} style={{filter:`drop-shadow(0 0 10px ${C})`}}/>
-              : <Mic    size={22} color="#00e5ff" strokeWidth={1.5} style={{filter:'drop-shadow(0 0 10px #00e5ff)'}}/>
+              ? <><span style={{color:C,marginRight:5,fontSize:10}}>●</span>Listening — tap to stop</>
+              : 'Tap the orb to speak with Aura'
             }
-          </motion.button>
+          </motion.p>
+          {isAuraSpeaking && !audioMuted && (
+            <p style={{ fontSize: 12, color: '#80deea', marginTop: -16, marginBottom: 18 }}>
+              Aura is speaking...
+            </p>
+          )}
+
+          <canvas ref={canvasRef} width={0} height={0} style={{display:'none'}}/>
+
+          {/* Error */}
+          <AnimatePresence>
+            {error && (
+              <motion.div initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} exit={{opacity:0}}
+                style={{width:'100%',maxWidth:460,padding:'12px 16px',marginBottom:14,textAlign:'center',
+                  background:'rgba(255,107,138,0.1)',border:'1px solid rgba(255,107,138,0.28)',
+                  borderRadius:14,color:'#ffb3c1',fontSize:13}}>
+                {error}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
-        {/* Layer 12: 3D Glass Specular Highlight */}
-        <div style={{
-          position: 'absolute', top: '3%', left: '14%', width: '72%', height: '28%',
-          borderRadius: '50% 50% 30% 30%', pointerEvents: 'none',
-          background: 'linear-gradient(to bottom, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.02) 65%, transparent 100%)',
-          transform: 'rotate(-10deg)',
-          filter: 'blur(1.5px)',
-        }}/>
-      </motion.div>
-      {/* ═════════════ END ORB ═════════════ */}
+        {/* Right Column: Chat Dashboard */}
+        <div className="flex-1 flex flex-col gap-6 w-full max-w-lg mx-auto h-full justify-center mt-8 md:mt-0">
+          
+          {/* Grounding tip */}
+          <AnimatePresence>
+            {isListening && auraEmotion !== 'calm' && (
+              <motion.div initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-8}}
+                className="glass"
+                style={{width:'100%',padding:'18px 22px'}}>
+                <p style={{fontSize:10.5,color:'var(--text-3)',marginBottom:6,textTransform:'uppercase',letterSpacing:'0.1em',fontWeight:700}}>Grounding tip</p>
+                <p style={{fontSize:15,color:'var(--text-1)',lineHeight:1.68}}>{em.tip}</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-      {/* Status */}
-      <motion.p key={String(isListening)} initial={{opacity:0}} animate={{opacity:1}}
-        style={{fontSize:13,color:'var(--text-3)',fontWeight:500,letterSpacing:'0.04em',marginBottom:28}}>
-        {isListening
-          ? <><span style={{color:C,marginRight:5,fontSize:10}}>●</span>Listening — tap to stop</>
-          : 'Tap the orb to speak with Aura'
-        }
-      </motion.p>
-      {isAuraSpeaking && !audioMuted && (
-        <p style={{ fontSize: 12, color: '#80deea', marginTop: -16, marginBottom: 18 }}>
-          Aura is speaking...
-        </p>
-      )}
+          {/* Transcript (User Speech Box) */}
+          <div className="glass w-full p-6 flex flex-col h-48 overflow-y-auto border border-white/5 relative">
+            <p className="text-[10.5px] text-zinc-500 mb-3 uppercase tracking-widest font-bold flex items-center gap-2">
+              <Mic size={12} /> You said
+            </p>
+            <p className="text-[15px] text-zinc-300 leading-relaxed whitespace-pre-wrap">
+              {auraTranscript || (isListening ? 'Listening...' : 'Awaiting your voice...')}
+            </p>
+          </div>
 
-      <canvas ref={canvasRef} width={0} height={0} style={{display:'none'}}/>
+          {/* Aura response Box */}
+          <div className="glass w-full p-6 flex flex-col min-h-[12rem] border border-cyan-500/30 relative" style={{ background: 'rgba(0, 229, 255, 0.03)' }}>
+            <p className="text-[10.5px] text-cyan-400 mb-3 uppercase tracking-widest font-bold flex items-center gap-2">
+              <Wind size={12} /> Aura AI
+            </p>
+            <p className="text-[16px] text-zinc-100 leading-relaxed whitespace-pre-wrap">
+              {auraResponse || 'Aura will process and respond here when you stop speaking.'}
+            </p>
+          </div>
 
-      {/* Error */}
-      <AnimatePresence>
-        {error && (
-          <motion.div initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} exit={{opacity:0}}
-            style={{width:'100%',maxWidth:460,padding:'12px 16px',marginBottom:14,textAlign:'center',
-              background:'rgba(255,107,138,0.1)',border:'1px solid rgba(255,107,138,0.28)',
-              borderRadius:14,color:'#ffb3c1',fontSize:13}}>
-            {error}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Grounding tip */}
-      <AnimatePresence>
-        {isListening && auraEmotion !== 'calm' && (
-          <motion.div initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-8}}
-            className="glass"
-            style={{width:'100%',maxWidth:460,padding:'18px 22px',marginBottom:12}}>
-            <p style={{fontSize:10.5,color:'var(--text-3)',marginBottom:6,textTransform:'uppercase',letterSpacing:'0.1em',fontWeight:700}}>Grounding tip</p>
-            <p style={{fontSize:15,color:'var(--text-1)',lineHeight:1.68}}>{em.tip}</p>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Transcript */}
-      <AnimatePresence>
-        {auraTranscript && (
-          <motion.div initial={{opacity:0,y:10}} animate={{opacity:1,y:0}}
-            className="glass"
-            style={{width:'100%',maxWidth:460,padding:'14px 18px',marginBottom:10}}>
-            <p style={{fontSize:10.5,color:'var(--text-3)',marginBottom:5,textTransform:'uppercase',letterSpacing:'0.1em',fontWeight:700}}>You said</p>
-            <p style={{fontSize:15,color:'var(--text-2)',lineHeight:1.68}}>{auraTranscript}</p>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Aura response */}
-      <AnimatePresence>
-        {auraResponse && (
-          <motion.div initial={{opacity:0,y:12}} animate={{opacity:1,y:0}}
-            className="glass"
-            style={{width:'100%',maxWidth:460,padding:'18px 22px', border:'1px solid rgba(0,229,255,0.3)'}}>
-            <p style={{fontSize:10.5,color:'#00e5ff',marginBottom:8,textTransform:'uppercase',letterSpacing:'0.1em',fontWeight:700}}>Aura</p>
-            <p style={{fontSize:16,color:'var(--text-1)',lineHeight:1.75}}>{auraResponse}</p>
-          </motion.div>
-        )}
-      </AnimatePresence>
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { ChatOpenAI } from "@langchain/openai";
 import { z } from "zod";
+import UserState from "../models/UserState.js";
 
 // Define the structured output schema using Zod
 const triageSchema = z.object({
@@ -86,6 +87,7 @@ const getStructuredLlm = () => {
  * Extracts semantics and velocity from user speech to determine cognitive stress.
  */
 export const voiceTriageHandler = async (req, res) => {
+  const userId = req.body?.userId;
   const transcriptChunk = String(req.body?.transcriptChunk || "").trim();
   const wpm = clampNumber(req.body?.wpm, 0, 0, 320);
   const averageVolume = clampNumber(req.body?.averageVolume, 0, 0, 100);
@@ -123,11 +125,28 @@ export const voiceTriageHandler = async (req, res) => {
     2. Look for cognitive distortions, especially "absolutes" (e.g., "never", "always", "everything is ruined").
     3. Check if the sentence structure is fragmented, indicating time-blindness or executive overwhelm.
     4. Based on these factors, categorize the stressTier into: BASELINE, ELEVATED, or PANIC_FREEZE.
-    5. Provide a short, empathetic 1-sentence grounding response to help the user regulate.
+    5. Provide a conversational, engaging, lighter, and slightly fun but empathetic response directly addressing the exact content of what the user said. It should help them regulate without sounding rigid or robotic. Keep it to 1-2 short sentences.
   `;
 
   try {
     const result = await model.invoke(prompt);
+
+    if (userId) {
+      try {
+        const user = await UserState.findOrCreate(userId);
+        let mappedEmotion = 'calm';
+        if (result.stressTier === 'ELEVATED') mappedEmotion = 'mild_anxiety';
+        else if (result.stressTier === 'PANIC_FREEZE') mappedEmotion = 'high_anxiety';
+        
+        await user.logVocalStress({
+          emotion: mappedEmotion,
+          arousalScore: result.stressTier === 'PANIC_FREEZE' ? 9 : result.stressTier === 'ELEVATED' ? 6 : 2,
+          taskContext: "Aura Voice Conversation"
+        });
+      } catch (err) {
+        console.error("Failed to save voice telemetry to UserState:", err);
+      }
+    }
 
     // Return the structured JSON directly to the frontend telemetry caller
     res.status(200).json({

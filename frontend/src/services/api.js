@@ -95,5 +95,5 @@ export const shatterApi = {
 // ── Clinical API ──────────────────────────────────────────────────────────────
 export const clinicalApi = {
   generateRecoveryProtocol: (userId, reportData) => postAI('/clinical/recovery-protocol', { userId, reportData }),
-  voiceTriage: (transcriptChunk, wpm, averageVolume) => postAI('/clinical/voice-triage', { transcriptChunk, wpm, averageVolume }),
+  voiceTriage: (userId, transcriptChunk, wpm, averageVolume) => postAI('/clinical/voice-triage', { userId, transcriptChunk, wpm, averageVolume }),
 };
