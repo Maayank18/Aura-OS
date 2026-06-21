@@ -719,7 +719,7 @@ export default function Landing() {
                 )}
                 Client
              </button>
-             <button 
+             {/* <button 
                 onClick={() => { setAuthFormMode('EMPLOYEE'); setAuthFormSubRole('USER'); }} 
                 style={{ position: 'relative', zIndex: 1, padding: '6px 18px', fontSize: 13, fontWeight: 700, color: currentMode === 'EMPLOYEE' ? '#fff' : (currentMode === 'CLIENT' ? '#7c3aed' : '#fff'), transition: 'color 0.3s', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
              >
@@ -732,7 +732,7 @@ export default function Landing() {
                   />
                 )}
                 Employee
-             </button>
+             </button> */}
           </div>
 
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>

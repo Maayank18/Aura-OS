@@ -15,7 +15,7 @@ export default function AuthToggle() {
 
   const modes = [
     { id: 'CLIENT', label: 'Consumer', icon: UserCircle2 },
-    { id: 'EMPLOYEE', label: 'Enterprise', icon: Building2 },
+    // { id: 'EMPLOYEE', label: 'Enterprise', icon: Building2 },
   ];
 
   const subRolesClient = [
