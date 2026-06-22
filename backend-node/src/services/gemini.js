@@ -28,13 +28,14 @@ const getClient = () => {
   return aiClient;
 };
 
-const FORGE_SYSTEM_INSTRUCTION = `Extract distinct worries from anxious text.
+const FORGE_SYSTEM_INSTRUCTION = `Atomize the user's text into distinct, literal fragments.
 RULES:
-1. Return JSON: { "worries": [ { "id": 1, "worry": "short string", "weight": 5 } ] }
-2. weight = urgency (1-10, 10=max).
-3. Combine duplicates. Max 10 items.
-4. "worry" max 8 words.
-5. If none, return { "worries": [] }`;
+1. Return JSON: { "worries": [ { "id": 1, "worry": "literal phrase", "weight": 5 } ] }
+2. PRESERVE EXACT PHRASING. Do NOT summarize or convert to nouns. If they write "I am lonely", output "I am lonely", NOT "loneliness".
+3. Split the text by punctuation (,, ., ;, !) or conjunctions (and, but, because) to create multiple individual blocks.
+4. Each block should represent one unbroken fragment of their thought.
+5. weight = urgency (1-10, 10=max).
+6. "worry" string max 10 words. Max 12 items total.`;
 
 const localFallbackExtraction = (rawText) => {
   const segments = rawText.split(/[,.!?;\n]+/).map((s) => s.trim()).filter(Boolean);
@@ -47,47 +48,24 @@ const localFallbackExtraction = (rawText) => {
 };
 
 /**
- * Extracts worries from text using the configured AI engine (Groq or OpenRouter).
+ * Extracts worries from text.
+ * As per exact user specification, EVERY single word is now atomized into its own block.
+ * This bypasses the LLM, reducing latency to 0ms and saving 100% of token costs!
  */
 export const extractWorries = async (rawText) => {
-  if (!rawText || rawText.trim().length < 3) return [];
+  if (!rawText || rawText.trim().length < 1) return [];
   const safeText = rawText.trim().slice(0, 1500);
 
-  let client;
-  try {
-    client = getClient();
-  } catch (err) {
-    console.error(`[ForgeExtractor] Client init failed: ${err.message}`);
-    console.warn('[ForgeExtractor] Falling back to local extractor.');
-    return localFallbackExtraction(safeText);
-  }
-
-  const modelName = (process.env.GROQ_API_KEY_FORGE || process.env.GROQ_API_KEY)
-    ? (process.env.GROQ_MODEL || 'llama-3.1-8b-instant')
-    : (process.env.OPENROUTER_MODEL || 'openai/gpt-4o-mini');
-
-  console.log(`[ForgeExtractor] Extracting worries using ${modelName}...`);
-
-  try {
-    const response = await client.chat.completions.create({
-      model: modelName,
-      messages: [
-        { role: "system", content: FORGE_SYSTEM_INSTRUCTION },
-        { role: "user", content: safeText }
-      ],
-      temperature: 0.2,
-      response_format: { type: 'json_object' } 
-    });
-
-    const content = response.choices?.[0]?.message?.content;
-    if (!content) throw new Error('AI provider returned an empty completion.');
-
-    const parsed = JSON.parse(content);
-    return parsed.worries || [];
-
-  } catch (err) {
-    console.error(`[ForgeExtractor] Extraction failed: ${err.message}`);
-    console.warn('[ForgeExtractor] Falling back to local extractor.');
-    return localFallbackExtraction(safeText);
-  }
+  // Split by whitespace to extract every individual word
+  const words = safeText.split(/\s+/).filter(Boolean);
+  
+  return words.map((word, idx) => {
+    // Optional: assign slightly higher weight to negative words for visual effect
+    const isNegative = /^(lonely|stressed|sad|angry|anxious|tensed|depressed|broken|lost|lack)$/i.test(word.replace(/[^a-zA-Z]/g, ''));
+    return {
+      id: idx + 1,
+      worry: word,
+      weight: isNegative ? 8 : 5
+    };
+  });
 };

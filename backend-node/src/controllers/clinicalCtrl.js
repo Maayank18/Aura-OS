@@ -1069,7 +1069,7 @@ export const downloadSessionReportPdfHandler = async (req, res, next) => {
 function _groupByDay(events, valueFn, key) {
   const map = {};
   events.forEach(e => {
-    const dt = new Date(e.timestamp);
+    const dt = new Date(e.timestamp || e.completedAt || e.createdAt);
     if (Number.isNaN(dt.getTime())) return;
     const day = dt.toISOString().split('T')[0];
     if (!map[day]) map[day] = { day, sum: 0, count: 0 };
@@ -1084,7 +1084,7 @@ function _groupByDay(events, valueFn, key) {
 function _groupByDayRatio(events, key) {
   const map = {};
   events.forEach(e => {
-    const dt = new Date(e.timestamp);
+    const dt = new Date(e.timestamp || e.completedAt || e.createdAt);
     if (Number.isNaN(dt.getTime())) return;
     const day = dt.toISOString().split('T')[0];
     if (!map[day]) map[day] = { day, completed: 0, total: 0 };
