@@ -72,6 +72,13 @@ const normalizeResult = (parsed, fallback) => {
     ? parsed.palette.filter((color) => typeof color === 'string' && HEX_RE.test(color)).slice(0, 5)
     : [];
 
+  const basePrompt = parsed.image_prompt || `${parsed.real_world_title}, ${parsed.emotion_unlocked} atmosphere`;
+  const imagePrompt = `${basePrompt}, masterpiece, highly detailed digital art, beautiful lighting, cinematic, 8k resolution, trending on artstation`;
+  const seed = Math.floor(Math.random() * 1000000);
+  const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(imagePrompt)}?width=800&height=500&nologo=true&seed=${seed}`;
+  
+  const svg_world_html = `<img src="${imageUrl}" alt="${parsed.real_world_title}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px;" />`;
+
   return {
     what_i_see: sanitizeText(parsed.what_i_see, fallback.what_i_see, 360),
     real_world_title: sanitizeText(parsed.real_world_title, fallback.real_world_title, 80),
@@ -79,7 +86,7 @@ const normalizeResult = (parsed, fallback) => {
     subject_category: sanitizeText(parsed.subject_category, fallback.subject_category, 40).toLowerCase(),
     palette: palette.length ? palette : fallback.palette,
     clinical_observation: sanitizeText(parsed.clinical_observation, fallback.clinical_observation, 420),
-    svg_world: sanitizeSvg(parsed.svg_world) || fallback.svg_world,
+    svg_world: svg_world_html,
     fallback: false,
   };
 };
@@ -143,27 +150,16 @@ export const buildLocalSketchFallback = (metrics = {}) => {
   };
 };
 
-const buildPrompt = (metrics = {}) => `You are the creative transformation engine inside AuraOS, a mental health support app.
-
-A user made a 30-second freehand sketch. Interpret the drawing generously and transform it into a beautiful SVG world.
-
-Stroke metadata:
-- Canvas coverage: ${metrics.coverage || 0}%
-- Stroke energy: ${metrics.strokeEnergy || 'moderate'}
-- Expression density: ${metrics.expressionDensity || 'moderate'}
-- Hesitation: ${metrics.hesitationIndex || 'low'}
-- Total strokes: ${metrics.totalStrokes || 0}
-- Stroke complexity: ${metrics.strokeComplexity || 'gestural'}
-
-Return ONLY valid JSON:
+const buildPrompt = (metrics = {}) => `Analyze 30s sketch. Return valid JSON.
+Metadata: Coverage ${metrics.coverage || 0}%, Energy ${metrics.strokeEnergy || 'moderate'}, Density ${metrics.expressionDensity || 'moderate'}, Hesitation ${metrics.hesitationIndex || 'low'}, Strokes ${metrics.totalStrokes || 0}, Complexity ${metrics.strokeComplexity || 'gestural'}.
 {
-  "what_i_see": "Warm 1-2 sentence interpretation. No diagnosis.",
+  "what_i_see": "1-2 sentence warm interpretation. No diagnosis.",
   "real_world_title": "3-5 words",
   "emotion_unlocked": "one simple emotion",
   "subject_category": "nature | figure | architecture | abstract | animal | cosmos | ocean | forest | city",
   "palette": ["#hex1", "#hex2", "#hex3"],
-  "clinical_observation": "One compassionate sentence about what the drawing pattern might reflect emotionally. Do not diagnose.",
-  "svg_world": "<svg viewBox='0 0 800 500' xmlns='http://www.w3.org/2000/svg'>complete self-contained SVG scene, no scripts, no foreignObject, 20-55 elements</svg>"
+  "clinical_observation": "1 compassionate sentence reflecting on drawing pattern. No diagnosis.",
+  "image_prompt": "Beautiful, atmospheric image generation prompt (max 60 words) based on sketch."
 }`;
 
 export const transformSketch = async ({ imageBase64, strokeMetrics }) => {
@@ -191,12 +187,13 @@ export const transformSketch = async ({ imageBase64, strokeMetrics }) => {
               type: 'image_url',
               image_url: {
                 url: `data:image/png;base64,${imageBase64}`,
+                detail: 'low',
               },
             },
           ],
         },
       ],
-      max_tokens: 4500,
+      max_tokens: 450,
       temperature: 0.85,
       response_format: { type: 'json_object' },
     });

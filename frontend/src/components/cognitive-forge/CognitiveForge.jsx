@@ -248,7 +248,26 @@ const computeHealthProfile = (gameSessions, worries, destroyedCount) => {
 // ── GameShell ────────────────────────────────────────────────────────────────
 function GameShell({ title, color, score, unit, onEnd, instruction, children }) {
   const [secs, setSecs] = useState(0);
-  useEffect(() => { const t = setInterval(()=>setSecs(s=>s+1),1000); return()=>clearInterval(t); }, []);
+  const onEndRef = useRef(onEnd);
+  const startRef = useRef(Date.now());
+  const hasLoggedRef = useRef(false);
+
+  useEffect(() => {
+    onEndRef.current = onEnd;
+  }, [onEnd]);
+
+  useEffect(() => {
+    const t = setInterval(()=>setSecs(s=>s+1),1000);
+    return () => {
+      clearInterval(t);
+      if (hasLoggedRef.current) return;
+      if (Date.now() - startRef.current > 1000) { // Prevent StrictMode premature logging
+        hasLoggedRef.current = true;
+        if (onEndRef.current) onEndRef.current();
+      }
+    };
+  }, []);
+
   const m = Math.floor(secs/60), s = secs%60;
   return (
     <div style={{ display:'flex', flexDirection:'column', flex:1, height:'100%', width:'100%', minHeight:0 }}>
@@ -273,10 +292,6 @@ function GameShell({ title, color, score, unit, onEnd, instruction, children }) 
         <span style={{ fontSize:10, color:'var(--text-3)', fontFamily:'monospace' }}>
           {String(m).padStart(2,'0')}:{String(s).padStart(2,'0')}
         </span>
-        <button onClick={onEnd}
-          style={{ fontSize:11, padding:'5px 16px', borderRadius:999, background:`${color}12`, border:`1px solid ${color}30`, color, fontWeight:700, cursor:'pointer', letterSpacing:'-0.01em' }}>
-          End + Log
-        </button>
       </div>
     </div>
   );

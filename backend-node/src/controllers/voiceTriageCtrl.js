@@ -112,20 +112,14 @@ export const voiceTriageHandler = async (req, res) => {
 
   // System instructions for the Catastrophic Linguistic Analyzer
   const prompt = `
-    You are a Catastrophic Linguistic Analyzer for a mental health platform.
-    Analyze the following transcript from the user. You are provided with the text itself and their speaking velocity in Words Per Minute (WPM), along with average volume.
-    
-    Metrics:
-    - Words Per Minute (WPM): ${wpm}
-    - Average Volume: ${averageVolume}
-    - Transcript: "${transcriptChunk}"
+    Analyze transcript. WPM: ${wpm}, Vol: ${averageVolume}.
+    Text: "${transcriptChunk}"
 
-    Instructions:
-    1. Assess if the WPM is over 160, indicating racing thoughts or elevated sympathetic arousal.
-    2. Look for cognitive distortions, especially "absolutes" (e.g., "never", "always", "everything is ruined").
-    3. Check if the sentence structure is fragmented, indicating time-blindness or executive overwhelm.
-    4. Based on these factors, categorize the stressTier into: BASELINE, ELEVATED, or PANIC_FREEZE.
-    5. Provide a conversational, engaging, lighter, and slightly fun but empathetic response directly addressing the exact content of what the user said. It should help them regulate without sounding rigid or robotic. Keep it to 1-2 short sentences.
+    1. WPM > 160 = racing thoughts.
+    2. Detect cognitive distortions (e.g. absolutes like "never").
+    3. Detect fragmented sentences = executive overwhelm.
+    4. Set stressTier: BASELINE, ELEVATED, or PANIC_FREEZE.
+    5. Write 1-2 short, conversational, empathetic sentences addressing content to help regulate.
   `;
 
   try {

@@ -28,16 +28,13 @@ const getClient = () => {
   return aiClient;
 };
 
-const FORGE_SYSTEM_INSTRUCTION = `You are a cognitive extraction engine embedded in a mental health app called AuraOS.
-Your sole job is to read messy, anxious, stream-of-consciousness text and extract each distinct worry.
-
-RULES - follow these exactly:
-1. Return ONLY valid JSON in this exact format: { "worries": [ { "id": 1, "worry": "short string", "weight": 5 } ] }
-2. weight = emotional urgency/distress level (10 = most overwhelming, 1 = minor).
-3. Combine duplicate or very similar worries into one entry.
-4. Maximum 10 items.
-5. Keep "worry" labels short enough to fit on a physics block - max 8 words.
-6. If the text contains no worries, return { "worries": [] }`;
+const FORGE_SYSTEM_INSTRUCTION = `Extract distinct worries from anxious text.
+RULES:
+1. Return JSON: { "worries": [ { "id": 1, "worry": "short string", "weight": 5 } ] }
+2. weight = urgency (1-10, 10=max).
+3. Combine duplicates. Max 10 items.
+4. "worry" max 8 words.
+5. If none, return { "worries": [] }`;
 
 const localFallbackExtraction = (rawText) => {
   const segments = rawText.split(/[,.!?;\n]+/).map((s) => s.trim()).filter(Boolean);
@@ -54,6 +51,7 @@ const localFallbackExtraction = (rawText) => {
  */
 export const extractWorries = async (rawText) => {
   if (!rawText || rawText.trim().length < 3) return [];
+  const safeText = rawText.trim().slice(0, 1500);
 
   let client;
   try {
@@ -61,7 +59,7 @@ export const extractWorries = async (rawText) => {
   } catch (err) {
     console.error(`[ForgeExtractor] Client init failed: ${err.message}`);
     console.warn('[ForgeExtractor] Falling back to local extractor.');
-    return localFallbackExtraction(rawText);
+    return localFallbackExtraction(safeText);
   }
 
   const modelName = (process.env.GROQ_API_KEY_FORGE || process.env.GROQ_API_KEY)
@@ -75,7 +73,7 @@ export const extractWorries = async (rawText) => {
       model: modelName,
       messages: [
         { role: "system", content: FORGE_SYSTEM_INSTRUCTION },
-        { role: "user", content: rawText }
+        { role: "user", content: safeText }
       ],
       temperature: 0.2,
       response_format: { type: 'json_object' } 
@@ -90,6 +88,6 @@ export const extractWorries = async (rawText) => {
   } catch (err) {
     console.error(`[ForgeExtractor] Extraction failed: ${err.message}`);
     console.warn('[ForgeExtractor] Falling back to local extractor.');
-    return localFallbackExtraction(rawText);
+    return localFallbackExtraction(safeText);
   }
 };

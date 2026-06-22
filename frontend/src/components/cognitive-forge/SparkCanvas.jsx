@@ -263,8 +263,33 @@ export default function SparkCanvas({ onSessionEnd, onClose }) {
     setStrokeMetrics(metrics);
     setPhase('processing');
 
+    // Downscale canvas for AI interpretation to save bandwidth and token processing overhead
+    const getLowResBase64 = (cv) => {
+      const tempCanvas = document.createElement('canvas');
+      const maxDim = 256;
+      let w = cv.width;
+      let h = cv.height;
+      if (w > h) {
+        if (w > maxDim) {
+          h = Math.round((h * maxDim) / w);
+          w = maxDim;
+        }
+      } else {
+        if (h > maxDim) {
+          w = Math.round((w * maxDim) / h);
+          h = maxDim;
+        }
+      }
+      tempCanvas.width = w;
+      tempCanvas.height = h;
+      const tempCtx = tempCanvas.getContext('2d');
+      tempCtx.drawImage(cv, 0, 0, w, h);
+      return tempCanvas.toDataURL('image/jpeg', 0.6);
+    };
+
     try {
-      const json = await forgeApi.transformSketch(dataUrl.split(',')[1], metrics);
+      const lowResDataUrl = getLowResBase64(canvas);
+      const json = await forgeApi.transformSketch(lowResDataUrl.split(',')[1], metrics);
       setResult(json.result);
       setPhase('reveal');
     } catch (err) {
@@ -439,6 +464,19 @@ export default function SparkCanvas({ onSessionEnd, onClose }) {
     setLogged(true);
     onSessionEnd?.(payload);
   }, [logged, onSessionEnd, result, strokeMetrics, timeLeft]);
+
+  const emitSessionRef = useRef(emitSession);
+  useEffect(() => {
+    emitSessionRef.current = emitSession;
+  }, [emitSession]);
+
+  useEffect(() => {
+    return () => {
+      if (emitSessionRef.current) {
+        emitSessionRef.current();
+      }
+    };
+  }, []);
 
   if (phase === 'intro') {
     return (
@@ -620,9 +658,6 @@ export default function SparkCanvas({ onSessionEnd, onClose }) {
 
           <div style={S.bottomActions}>
             <button onClick={restart} style={{ ...S.cta, flex: 1, padding: '12px' }}>Draw again</button>
-            <button onClick={emitSession} disabled={logged} style={{ ...S.secondaryButton, opacity: logged ? 0.5 : 1 }}>
-              {logged ? 'Saved' : 'Save to Forge'}
-            </button>
             {onClose && <button onClick={onClose} style={S.iconButton}>Exit</button>}
           </div>
         </div>

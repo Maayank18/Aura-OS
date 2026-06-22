@@ -613,11 +613,23 @@ export default function MetronomeTapping({ onSessionEnd, onClose }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [handleTap]);
 
+  const finishSessionRef = useRef(finishSession);
+  useEffect(() => {
+    finishSessionRef.current = finishSession;
+  }, [finishSession]);
+
   useEffect(() => () => {
     if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
     stopScheduler();
     clearVisualTimers();
     audio.close();
+    
+    // Auto-log on unmount if we haven't already
+    if (phaseRef.current !== 'intro' && phaseRef.current !== 'results') {
+      if (allTapsRef.current && allTapsRef.current.length > 0) {
+        finishSessionRef.current();
+      }
+    }
   }, [audio, clearVisualTimers, stopScheduler]);
 
   const resetSession = useCallback(() => {

@@ -205,7 +205,7 @@ export default function Dashboard() {
                       </div>
                     </div>
                     <p style={{ fontSize:28, fontWeight:800, color:'#1a2633', marginTop:8 }}>
-                      {data.stats?.[sc.key] ?? '—'}
+                      {sc.key === 'forgeSessions' ? ((data.stats?.forgeSessions || 0) + (data.stats?.gameSessions || 0)) : (data.stats?.[sc.key] ?? '0')}
                     </p>
                   </motion.div>
                 );

@@ -285,10 +285,10 @@ export default function GuardianDashboard() {
 
       {/* ── Stat cards ── */}
       <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 22 }}>
-        <StatCard icon={Zap}      label="Tasks Completed" value={stats.tasksCompleted}  color="#22c55e" />
-        <StatCard icon={Activity} label="Tasks Abandoned"  value={stats.tasksAbandoned}  color="#ff6b8a" />
-        <StatCard icon={Brain}    label="Forge Sessions"   value={stats.forgeSessions}    color="#c4b5fd" />
-        <StatCard icon={Shield}   label="Stress Spikes"    value={stats.stressSpikes}     color="#ffb300" />
+        <StatCard icon={Zap}      label="Tasks Completed" value={stats.tasksCompleted || 0}  color="#22c55e" />
+        <StatCard icon={Activity} label="Tasks Abandoned"  value={stats.tasksAbandoned || 0}  color="#ff6b8a" />
+        <StatCard icon={Brain}    label="Forge Sessions"   value={(stats.gameSessions || 0) + (stats.forgeSessions || 0)}    color="#c4b5fd" />
+        <StatCard icon={Shield}   label="Stress Spikes"    value={stats.stressSpikes || 0}     color="#ffb300" />
       </div>
 
       {/* ── Charts row ── */}
