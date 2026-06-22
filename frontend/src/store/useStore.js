@@ -235,7 +235,8 @@ const useStore = create((set, get) => ({
 
   dispatchVoiceTelemetry: async (transcriptChunk, wpm, averageVolume) => {
     try {
-      const result = await clinicalApi.voiceTriage(transcriptChunk, wpm, averageVolume);
+      const { userId } = get();
+      const result = await clinicalApi.voiceTriage(userId, transcriptChunk, wpm, averageVolume);
       if (result && result.data) {
         set({
           auraEmotion: result.data.stressTier === 'PANIC_FREEZE' ? 'high_anxiety' 

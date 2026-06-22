@@ -189,12 +189,40 @@ const AuraVoiceEngine = () => {
     };
   }, [isListening, dispatchVoiceTelemetry]);
 
+  // Speak the grounding response out loud when it is received
+  useEffect(() => {
+    if (auraResponse && typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(auraResponse);
+      const voices = window.speechSynthesis.getVoices();
+      
+      // Calming, natural-sounding English voice selection
+      const preferredVoice =
+        voices.find((v) => v.name.includes('Google UK English Female')) ||
+        voices.find((v) => v.name.includes('Samantha')) ||
+        voices.find((v) => v.name.includes('Karen')) ||
+        voices.find((v) => v.name.includes('Zira')) ||
+        voices.find((v) => v.lang === 'en-US' && v.name.includes('Female')) ||
+        voices.find((v) => v.lang === 'en-US') ||
+        voices[0];
+        
+      if (preferredVoice) utterance.voice = preferredVoice;
+      utterance.rate = 1.05;
+      utterance.pitch = 1.35;
+      
+      window.speechSynthesis.speak(utterance);
+    }
+  }, [auraResponse]);
+
   // Clean up on unmount
   useEffect(() => {
     return () => {
       if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
       if (speechRecognitionRef.current) speechRecognitionRef.current.stop();
       if (audioContextRef.current) audioContextRef.current.close();
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
     };
   }, []);
 

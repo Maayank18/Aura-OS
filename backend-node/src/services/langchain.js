@@ -12,7 +12,6 @@ const __dirname = path.dirname(__filename);
 
 /* ── Schemas (ADHD & Clinical Recovery) ────────────────────────────────── */
 
-/* ── Schemas ────────────────────────────── */
 const MicroQuestSchema = z.object({
   microquests: z.array(z.object({
     id:               z.number().int().min(1),
@@ -70,7 +69,7 @@ const makeModel = (schema, name, temp = 0.38) => {
         }
       }
     });
-    return llm.withStructuredOutput(schema, { name, strict: true });
+    return llm.withStructuredOutput(schema, { name, method: "functionCalling" });
   } catch (err) {
     console.warn('[LangChain] Model init failed:', err.message);
     return null;

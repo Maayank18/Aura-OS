@@ -53,10 +53,13 @@ const GuardianSchema = new mongoose.Schema({
 /* ── 🌟 NEW: Clinical Telemetry sub-schemas ────────────────── */
 
 const VocalStressEventSchema = new mongoose.Schema({
-  timestamp:     { type: Date, default: Date.now },
-  emotion:       { type: String, enum: ['calm', 'mild_anxiety', 'high_anxiety'], default: 'calm' },
-  arousalScore:  { type: Number, min: 1, max: 10, default: 5 }, // 1 = calm, 10 = acute distress
-  taskContext:   { type: String, maxlength: 200 },               // what was the user doing
+  timestamp:           { type: Date, default: Date.now },
+  emotion:             { type: String, enum: ['calm', 'mild_anxiety', 'high_anxiety'], default: 'calm' },
+  arousalScore:        { type: Number, min: 1, max: 10, default: 5 }, // 1 = calm, 10 = acute distress
+  taskContext:         { type: String, maxlength: 200 },               // what was the user doing
+  transcriptChunk:     { type: String, default: '' },
+  wpm:                 { type: Number, default: 0 },
+  detectedDistortions: { type: [String], default: [] }
 }, { _id: false });
 
 const ForgeSessionSchema = new mongoose.Schema({
@@ -191,9 +194,16 @@ UserStateSchema.methods.ensureClinicalTelemetry = function () {
 };
 
 // 🌟 NEW: Convenience helper — push a vocal stress event
-UserStateSchema.methods.logVocalStress = async function ({ emotion, arousalScore, taskContext }) {
+UserStateSchema.methods.logVocalStress = async function ({ emotion, arousalScore, taskContext, transcriptChunk, wpm, detectedDistortions }) {
   this.ensureClinicalTelemetry();
-  this.clinicalTelemetry.vocalStressEvents.push({ emotion, arousalScore, taskContext });
+  this.clinicalTelemetry.vocalStressEvents.push({ 
+    emotion, 
+    arousalScore, 
+    taskContext,
+    transcriptChunk,
+    wpm,
+    detectedDistortions
+  });
   // Keep rolling 90-day window
   const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
   this.clinicalTelemetry.vocalStressEvents =

@@ -77,7 +77,7 @@ const getStructuredLlm = () => {
 
   structuredLlm = llm.withStructuredOutput(triageSchema, {
     name: "CatastrophicLinguisticAnalysis",
-    strict: true,
+    method: "functionCalling",
   });
   return structuredLlm;
 };
@@ -119,7 +119,14 @@ export const voiceTriageHandler = async (req, res) => {
     2. Detect cognitive distortions (e.g. absolutes like "never").
     3. Detect fragmented sentences = executive overwhelm.
     4. Set stressTier: BASELINE, ELEVATED, or PANIC_FREEZE.
-    5. Write 1-2 short, conversational, empathetic sentences addressing content to help regulate.
+    
+    Strict Persona & Response Rules:
+    - Write 1-2 short, conversational, empathetic sentences addressing content to help regulate (groundingResponse).
+    - You are not a generic AI. You are a deeply caring, protective therapist and a close personal guardian. Your responses must feel incredibly warm, loving, and human.
+    - Where appropriate, weave in natural terms of kinship and endearment (such as 'beta' or 'bhaiya', adjusting for a comforting, familial dynamic) to make the user feel unconditionally safe and heard.
+    
+    Strict Language Rule:
+    - You must only process and respond in English. Ignore any non-English inputs.
   `;
 
   try {
@@ -135,7 +142,10 @@ export const voiceTriageHandler = async (req, res) => {
         await user.logVocalStress({
           emotion: mappedEmotion,
           arousalScore: result.stressTier === 'PANIC_FREEZE' ? 9 : result.stressTier === 'ELEVATED' ? 6 : 2,
-          taskContext: "Aura Voice Conversation"
+          taskContext: "Aura Voice Conversation",
+          transcriptChunk,
+          wpm,
+          detectedDistortions: result.detectedDistortions || []
         });
       } catch (err) {
         console.error("Failed to save voice telemetry to UserState:", err);
