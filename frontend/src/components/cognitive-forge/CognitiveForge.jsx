@@ -127,6 +127,41 @@ const derivePredictedEffects = (gameId, metrics) => {
           : 'Slow scanning — significant attention deficit; clinical follow-up recommended.');
       break;
     }
+    case 'processing_grid': {
+      const deltas = extraData.deltas || [];
+      const avgDelta = deltas.length ? Math.round(deltas.reduce((a,b)=>a+b,0)/deltas.length) : 0;
+      // Calculate variance/spikes: any delta > 2.5x the average is a "Processing Delay Spike"
+      const spikeCount = deltas.filter(d => d > avgDelta * 2.5).length;
+      eff.stressReduction    = 4;
+      eff.dopamineActivation = 6;
+      eff.focusScore         = Math.max(1, 10 - spikeCount * 2);
+      eff.arousalLevel       = spikeCount > 3 ? 'high' : 'moderate';
+      eff.clinicalNote = `Processing Grid: ${durationSeconds}s total, ${avgDelta}ms avg latency. Detect ${spikeCount} delay spikes. `
+        + (spikeCount > 3 ? 'High cognitive latency variance; indicates strong environmental distractibility or brain fog.'
+          : spikeCount > 0 ? 'Minor processing delays; some mental fatigue present.'
+          : 'Extremely consistent processing speed; resilient to ambient distraction.');
+      break;
+    }
+    case 'overcharge_protocol': {
+      const avgCashOut = extraData.avgCashOut || 0;
+      const explosions = extraData.explosions || 0;
+      eff.stressReduction    = 2;
+      eff.dopamineActivation = explosions >= 5 ? 9 : 5;
+      if (explosions >= 7) {
+        eff.arousalLevel = 'high'; eff.focusScore = 3;
+        eff.clinicalNote = `Overcharge Protocol (BART): ${explosions}/10 explosions, avg cash-out ${Math.round(avgCashOut*100)}%. `
+          + `[HIGH_IMPULSIVITY] Markedly high risk-taking behavior; intense dopamine seeking. Potential marker for ADHD impulsivity or manic features.`;
+      } else if (avgCashOut < 0.20 && explosions <= 1) {
+        eff.arousalLevel = 'moderate'; eff.focusScore = 8;
+        eff.clinicalNote = `Overcharge Protocol (BART): ${explosions}/10 explosions, avg cash-out ${Math.round(avgCashOut*100)}%. `
+          + `[SEVERE_RISK_AVERSION] Premature bail-outs detected. Indicates strong anxiety-driven risk aversion and low reward tolerance.`;
+      } else {
+        eff.arousalLevel = 'moderate'; eff.focusScore = 6;
+        eff.clinicalNote = `Overcharge Protocol (BART): ${explosions}/10 explosions, avg cash-out ${Math.round(avgCashOut*100)}%. `
+          + `Moderate risk calibration. Healthy balance of dopamine seeking and prefrontal cortical inhibition.`;
+      }
+      break;
+    }
     case 'metronome_tapping': {
       const attentionScore = extraData.attentionScore ?? accuracy ?? 0;
       const avgOffset = extraData.avgOffsetMs ?? avgReactionMs ?? 150;
@@ -967,6 +1002,367 @@ function NumberDash({ onSessionEnd }) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
+// GAME 7 — PROCESSING GRID (Schulte Table with Distraction Engine & Latency Tracking)
+// ════════════════════════════════════════════════════════════════════════════════
+function ProcessingGrid({ onSessionEnd }) {
+  const [phase, setPhase] = useState('waiting');
+  const [grid, setGrid] = useState([]);
+  const [next, setNext] = useState(1);
+  const [startTime, setStartTime] = useState(null);
+  const [elapsed, setElapsed] = useState(0);
+  const [mistakes, setMistakes] = useState(0);
+  const [path, setPath] = useState([]); 
+  const [deltas, setDeltas] = useState([]);
+  const [flashCell, setFlashCell] = useState(null);
+  
+  const rafRef = useRef(null), startRef = useRef(Date.now());
+  const lastClickRef = useRef(null);
+  const containerRef = useRef(null); 
+
+  const buildGrid = () => { 
+    const n = Array.from({length:25}, (_, i) => i + 1); 
+    for(let i=n.length-1; i>0; i--){
+      const j=Math.floor(Math.random()*(i+1));
+      [n[i],n[j]]=[n[j],n[i]];
+    } 
+    return n; 
+  };
+
+  useEffect(() => {
+    if (phase !== 'running') return;
+    const tick = () => { 
+      setElapsed(Math.round((Date.now()-startTime)/100)/10); 
+      rafRef.current = requestAnimationFrame(tick); 
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [phase, startTime]);
+
+  const startRound = () => { 
+    setGrid(buildGrid()); 
+    setNext(1); 
+    setElapsed(0); 
+    setMistakes(0);
+    setPath([]);
+    setDeltas([]);
+    const now = Date.now(); 
+    setStartTime(now); 
+    lastClickRef.current = now;
+    setPhase('running'); 
+  };
+
+  const handleCell = (num, e) => {
+    if (phase !== 'running') return;
+    
+    if (containerRef.current && num === next) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      setPath(prev => [...prev, {x, y}]);
+    }
+
+    if (num === next) {
+      playClick(); 
+      setFlashCell(num); 
+      setTimeout(() => setFlashCell(null), 250);
+      
+      const now = Date.now();
+      const delta = now - lastClickRef.current;
+      setDeltas(prev => [...prev, delta]);
+      lastClickRef.current = now;
+
+      if (next + 1 > 25) { 
+        cancelAnimationFrame(rafRef.current); 
+        const rt = Math.round((now - startTime)/100)/10; 
+        setElapsed(rt); 
+        setPhase('done'); 
+      } else {
+        setNext(n => n + 1);
+      }
+    } else { 
+      playWrong(); 
+      setFlashCell(num); 
+      setMistakes(m => m + 1); 
+      setTimeout(() => setFlashCell(null), 300); 
+    }
+  };
+
+  return (
+    <GameShell title="Processing Grid" color="#a78bfa" score={deltas.length} unit="nodes" 
+      onEnd={() => { 
+        const dur = Math.round((Date.now() - startRef.current)/1000); 
+        const rt = Math.round((Date.now() - startTime)/100)/10; 
+        onSessionEnd({
+          gameId: 'processing_grid',
+          gameName: 'Processing Grid',
+          durationSeconds: dur,
+          interactions: next,
+          avgReactionMs: deltas.length ? Math.round(deltas.reduce((a,b)=>a+b,0)/deltas.length) : 0,
+          accuracy: 100,
+          score: rt,
+          extraData: { bestTime: rt, deltas }
+        }); 
+      }}
+      instruction="Connect 1 → 25 in order through the fog">
+      
+      <motion.div animate={phase === 'running' ? { rotate: [-2, 2, -2], scale: [0.98, 1.02, 0.98] } : {}} transition={{ repeat: Infinity, duration: 8, ease: "easeInOut" }}
+        style={{width:'100%',height:'100%',background:'radial-gradient(ellipse at 50% 30%, rgba(167,139,250,0.1), transparent 60%), #05020a',borderRadius:14,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:10,padding:'8px 0'}}>
+        
+        {phase === 'waiting' || phase === 'done' ? (
+          <div style={{textAlign:'center'}}>
+            {phase === 'done' && <div style={{marginBottom:12}}><p style={{fontSize:22,fontWeight:900,color:'#a78bfa'}}>{elapsed}s</p></div>}
+            {phase === 'waiting' && <div style={{fontSize:36,marginBottom:12}}>🎯</div>}
+            <p style={{fontSize:11,color:'rgba(167,139,250,0.6)',fontWeight:600,marginBottom:14}}>{phase === 'waiting' ? 'Connect 1→25 in the fog, track latency' : 'Processing complete!'}</p>
+            <button onClick={startRound} style={{padding:'8px 22px',borderRadius:999,background:'rgba(167,139,250,0.12)',border:'1px solid rgba(167,139,250,0.35)',color:'#a78bfa',fontWeight:700,fontSize:13,cursor:'pointer'}}>{phase === 'done' ? 'Analyze & Reset' : 'Initiate Scan'}</button>
+          </div>
+        ) : (
+          <>
+            <div style={{display:'flex',gap:16,alignItems:'center'}}>
+              <span style={{fontSize:10,color:'rgba(167,139,250,0.5)',fontFamily:'monospace'}}>{elapsed}s</span>
+              <div style={{display:'flex',alignItems:'center',gap:6}}>
+                <span style={{fontSize:11,color:'rgba(167,139,250,0.5)',fontWeight:600}}>next:</span>
+                <motion.span key={next} initial={{scale:1.5,opacity:0}} animate={{scale:1,opacity:1}} style={{fontSize:22,fontWeight:900,color:'#a78bfa',lineHeight:1}}>{next}</motion.span>
+              </div>
+              <span style={{fontSize:10,color:'rgba(255,107,138,0.5)'}}>{mistakes} err</span>
+            </div>
+            
+            <div ref={containerRef} style={{position:'relative', display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:4, padding:'0 10px', width:260, height:260}}>
+              <svg style={{position:'absolute', top:0, left:0, width:'100%', height:'100%', pointerEvents:'none', zIndex:10}}>
+                {path.length > 1 && <polyline points={path.map(p => `${p.x},${p.y}`).join(' ')} fill="none" stroke="rgba(167,139,250,0.6)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{filter: 'drop-shadow(0 0 4px rgba(167,139,250,0.8))'}} />}
+              </svg>
+              
+              {grid.map(num => {
+                const isPast = num < next, isNext = num === next, isFlash = flashCell === num;
+                return(
+                  <motion.div key={num} onClick={(e)=>handleCell(num, e)} animate={{scale:isFlash?1.12:1}} transition={{duration:0.1}}
+                    style={{width:42,height:42,borderRadius:11,display:'flex',alignItems:'center',justifyContent:'center',fontSize:isPast?11:14,fontWeight:900,cursor:isPast?'default':'pointer',
+                      background:isPast?'rgba(167,139,250,0.04)':isFlash?'rgba(167,139,250,0.45)':isNext?'rgba(167,139,250,0.14)':'rgba(255,255,255,0.04)',
+                      border:`2px solid ${isPast?'rgba(167,139,250,0.1)':isNext?'rgba(167,139,250,0.7)':'rgba(255,255,255,0.07)'}`,
+                      color:isPast?'rgba(167,139,250,0.18)':isNext?'#a78bfa':'rgba(255,255,255,0.55)',
+                      boxShadow:isNext?'0 0 12px rgba(167,139,250,0.35)':'none',transition:'background 0.1s,border 0.1s',userSelect:'none', zIndex:5}}>
+                    {isPast?'✓':num}
+                  </motion.div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </motion.div>
+    </GameShell>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// GAME 8 — OVERCHARGE PROTOCOL (BART)
+// ════════════════════════════════════════════════════════════════════════════════
+function OverchargeProtocol({ onSessionEnd }) {
+  const [phase, setPhase] = useState('waiting');
+  const [round, setRound] = useState(1);
+  const [charge, setCharge] = useState(0);
+  const [maxCharge, setMaxCharge] = useState(1000);
+  const [cashOuts, setCashOuts] = useState([]);
+  const [explosions, setExplosions] = useState(0);
+  const [isExploded, setIsExploded] = useState(false);
+  const TOTAL_ROUNDS = 10;
+  
+  const rafRef = useRef(null);
+  const chargeRef = useRef(0);
+  const isHoldingRef = useRef(false);
+  const lastTimeRef = useRef(0);
+  const maxChargeRef = useRef(1000);
+
+  const containerRef = useRef(null);
+  const engineRef = useRef(null);
+  const renderRef = useRef(null);
+  const runnerRef = useRef(null);
+
+  const cleanupPhysics = useCallback(() => {
+    if (renderRef.current) { Render.stop(renderRef.current); renderRef.current.canvas.remove(); renderRef.current = null; }
+    if (runnerRef.current) { Runner.stop(runnerRef.current); runnerRef.current = null; }
+    if (engineRef.current) { World.clear(engineRef.current.world); Engine.clear(engineRef.current); engineRef.current = null; }
+  }, []);
+
+  useEffect(() => { return cleanupPhysics; }, [cleanupPhysics]);
+
+  const triggerExplosion = useCallback(() => {
+    playSmash();
+    isHoldingRef.current = false;
+    cancelAnimationFrame(rafRef.current);
+    setIsExploded(true);
+    setExplosions(prev => prev + 1);
+    
+    // Matter.js explosion
+    setTimeout(() => {
+      if (!containerRef.current) return;
+      cleanupPhysics();
+      const engine = Engine.create({ gravity: { x: 0, y: 0.8 } });
+      const render = Render.create({
+        element: containerRef.current,
+        engine,
+        options: { width: 300, height: 300, wireframes: false, background: 'transparent' }
+      });
+      engineRef.current = engine; renderRef.current = render; runnerRef.current = Runner.create();
+      
+      const bodies = [];
+      const cx = 150, cy = 150;
+      for (let i = 0; i < 50; i++) {
+        const size = Math.random() * 8 + 4;
+        const b = Bodies.polygon(cx + (Math.random()-0.5)*40, cy + (Math.random()-0.5)*40, Math.floor(Math.random()*4+3), size, {
+          render: { fillStyle: Math.random() > 0.5 ? '#ff2052' : '#f43f5e' }
+        });
+        const angle = Math.random() * Math.PI * 2;
+        const force = Math.random() * 0.08 + 0.02;
+        Body.applyForce(b, {x: cx, y: cy}, {x: Math.cos(angle)*force, y: Math.sin(angle)*force});
+        bodies.push(b);
+      }
+      const walls = [
+        Bodies.rectangle(150, 310, 300, 20, { isStatic: true, render:{visible:false} })
+      ];
+      World.add(engine.world, [...bodies, ...walls]);
+      Render.run(render); Runner.run(runnerRef.current, engine);
+      
+      setTimeout(() => {
+        handleNextRound();
+      }, 2500);
+    }, 10);
+  }, [cleanupPhysics]);
+
+  const handleNextRound = () => {
+    cleanupPhysics();
+    if (round >= TOTAL_ROUNDS) {
+      setPhase('done');
+    } else {
+      setRound(r => r + 1);
+      setCharge(0);
+      chargeRef.current = 0;
+      setIsExploded(false);
+      setMaxCharge(Math.random() * 800 + 400); 
+      maxChargeRef.current = Math.random() * 800 + 400;
+    }
+  };
+
+  const cashOut = () => {
+    playCorrect();
+    isHoldingRef.current = false;
+    cancelAnimationFrame(rafRef.current);
+    const capacityPct = chargeRef.current / maxChargeRef.current;
+    setCashOuts(prev => [...prev, capacityPct]);
+    
+    setTimeout(() => {
+      handleNextRound();
+    }, 1000);
+  };
+
+  const startLoop = () => {
+    isHoldingRef.current = true;
+    lastTimeRef.current = performance.now();
+    
+    const loop = (time) => {
+      if (!isHoldingRef.current) return;
+      const delta = time - lastTimeRef.current;
+      lastTimeRef.current = time;
+      
+      chargeRef.current += delta * 0.5 * (1 + chargeRef.current / 300);
+      setCharge(chargeRef.current);
+      
+      const prob = Math.pow(chargeRef.current / maxChargeRef.current, 2);
+      if (Math.random() < prob * 0.05) { 
+        triggerExplosion();
+        return;
+      }
+      if (chargeRef.current >= maxChargeRef.current * 1.5) {
+        triggerExplosion();
+        return;
+      }
+      rafRef.current = requestAnimationFrame(loop);
+    };
+    rafRef.current = requestAnimationFrame(loop);
+  };
+
+  const stopLoop = () => {
+    if (isHoldingRef.current && !isExploded) {
+      cashOut();
+    }
+  };
+
+  const resetGame = () => {
+    setRound(1); setCashOuts([]); setExplosions(0); setCharge(0); chargeRef.current=0; setIsExploded(false);
+    setMaxCharge(1000); maxChargeRef.current = 1000; setPhase('waiting');
+  };
+
+  useEffect(() => {
+    if (phase === 'done') {
+      const avgCashOut = cashOuts.length ? cashOuts.reduce((a,b)=>a+b,0)/cashOuts.length : 0;
+      onSessionEnd({
+        gameId: 'overcharge_protocol',
+        gameName: 'Overcharge Protocol',
+        durationSeconds: 30,
+        interactions: round,
+        avgReactionMs: 0,
+        accuracy: Math.round((cashOuts.length / TOTAL_ROUNDS) * 100),
+        score: cashOuts.length * 10,
+        extraData: { avgCashOut, explosions }
+      });
+    }
+  }, [phase, cashOuts, explosions, round, onSessionEnd]);
+
+  const chargeRatio = Math.min(1, charge / maxCharge);
+  const r = Math.min(255, 0 + chargeRatio * 255);
+  const g = Math.max(32, 229 - chargeRatio * 197);
+  const b = Math.max(82, 255 - chargeRatio * 173);
+  const blur = 4 + chargeRatio * 20;
+  
+  const dx = chargeRatio > 0.5 ? (Math.random()-0.5) * (chargeRatio*10) : 0;
+  const dy = chargeRatio > 0.5 ? (Math.random()-0.5) * (chargeRatio*10) : 0;
+
+  return (
+    <GameShell title="Overcharge" color="#ff2052" score={cashOuts.length} unit="saves" onEnd={resetGame}
+      instruction="Hold to charge. Release before it overcharges!">
+      <div style={{width:'100%',height:'100%',background:'radial-gradient(ellipse at 50% 30%, rgba(255,32,82,0.1), transparent 60%), #05020a',borderRadius:14,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:10,padding:'8px 0', position:'relative'}}>
+        
+        {phase === 'waiting' || phase === 'done' ? (
+          <div style={{textAlign:'center'}}>
+            {phase === 'done' && <div style={{marginBottom:12}}><p style={{fontSize:22,fontWeight:900,color:'#ff2052'}}>{explosions} Blown</p><p style={{fontSize:10,color:'rgba(255,32,82,0.55)'}}>Avg Cashout: {Math.round((cashOuts.length ? cashOuts.reduce((a,b)=>a+b,0)/cashOuts.length : 0)*100)}%</p></div>}
+            {phase === 'waiting' && <div style={{fontSize:36,marginBottom:12}}>⚡</div>}
+            <p style={{fontSize:11,color:'rgba(255,32,82,0.6)',fontWeight:600,marginBottom:14}}>{phase === 'waiting' ? 'Hold to charge. Release to bank it. Do not explode.' : 'Protocol complete.'}</p>
+            <button onClick={()=>{setPhase('running'); maxChargeRef.current=1000;}} style={{padding:'8px 22px',borderRadius:999,background:'rgba(255,32,82,0.12)',border:'1px solid rgba(255,32,82,0.35)',color:'#ff2052',fontWeight:700,fontSize:13,cursor:'pointer'}}>{phase === 'done' ? 'Again →' : 'Initiate'}</button>
+          </div>
+        ) : (
+          <>
+            <div style={{display:'flex',gap:16,alignItems:'center'}}>
+              <span style={{fontSize:10,color:'rgba(255,32,82,0.5)',fontFamily:'monospace'}}>RND {round}/{TOTAL_ROUNDS}</span>
+              <span style={{fontSize:10,color:'rgba(255,32,82,0.5)'}}>{explosions} EXPLODED</span>
+            </div>
+            
+            <div ref={containerRef} style={{position:'relative', width:300, height:300, display:'flex', alignItems:'center', justifyContent:'center'}}>
+              {!isExploded && (
+                <div 
+                  onMouseDown={startLoop} onMouseUp={stopLoop} onMouseLeave={stopLoop}
+                  onTouchStart={(e)=>{e.preventDefault();startLoop();}} onTouchEnd={(e)=>{e.preventDefault();stopLoop();}}
+                  style={{
+                    width: 120 + chargeRatio * 80, 
+                    height: 120 + chargeRatio * 80, 
+                    borderRadius: '50%',
+                    background: `rgba(${r},${g},${b}, 0.2)`,
+                    border: `4px solid rgb(${r},${g},${b})`,
+                    boxShadow: `0 0 ${blur}px rgb(${r},${g},${b})`,
+                    transform: `translate(${dx}px, ${dy}px)`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: 'pointer', userSelect: 'none', transition: 'width 0.1s, height 0.1s'
+                  }}>
+                  <span style={{color:`rgb(${r},${g},${b})`, fontWeight:900, fontSize:24}}>{Math.round(charge)}</span>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </GameShell>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+
 // GAME 6 — BREATHE FLOW
 // ════════════════════════════════════════════════════════════════════════════════
 function BreatheFlow({ onSessionEnd }) {
@@ -1198,12 +1594,14 @@ function GameCard({ game, onClick }) {
 }
 
 const GAME_DEFS = [
-  { id:'metronome_tapping', name:'Rhythm Sync', emoji:'IM', color:'#00e5ff', tagline:'Tap in sync with a beat', mechanic:'Tap to beat', side:'right', Component:MetronomeTapping },
-  { id:'spark_canvas', name:'Spark Canvas', emoji:'✦', color:'#c4b5fd', tagline:'Draw a world from feeling', mechanic:'30-sec sketch', side:'left', Component:SparkCanvas },
-  { id:'color_sort',      name:'Color Sort',      emoji:'🎨', color:'#00e5ff', tagline:'Sort by colour logic',   mechanic:'Drag & match',  side:'left',  Component:ColorSort      },
-  { id:'word_smash',      name:'Word Smash',      emoji:'💥', color:'#c4b5fd', tagline:'Crush negativity',       mechanic:'Click to smash', side:'left', Component:WordSmash      },
-  { id:'memory_pulse',    name:'Memory Pulse',    emoji:'🧠', color:'#a78bfa', tagline:'Test working memory',    mechanic:'Sequence repeat',side:'right', Component:MemoryPulse    },
-  { id:'perception_probe',name:'Perspective',     emoji:'👁️', color:'#5eead4', tagline:'Cognitive rigidity test', mechanic:'Illusion switch', side:'right', Component:PerceptionProbe    },
+  { id:'metronome_tapping', name:'Rhythm Sync', emoji:'IM', color:'#00e5ff', tagline:'Tap in sync with a beat', mechanic:'Tap to beat', side:'right', explanation:'Assesses timing, impulsivity, and sustained attention through rhythmic synchronization.', Component:MetronomeTapping },
+  { id:'spark_canvas', name:'Spark Canvas', emoji:'✦', color:'#c4b5fd', tagline:'Draw a world from feeling', mechanic:'30-sec sketch', side:'left', explanation:'Measures emotional state, agitation, and motor control via expressive digital drawing.', Component:SparkCanvas },
+  { id:'color_sort',      name:'Color Sort',      emoji:'🎨', color:'#00e5ff', tagline:'Sort by colour logic',   mechanic:'Drag & match',  side:'left', explanation:'Evaluates cognitive flexibility and executive functioning through color-matching rules.', Component:ColorSort      },
+  { id:'word_smash',      name:'Word Smash',      emoji:'💥', color:'#c4b5fd', tagline:'Crush negativity',       mechanic:'Click to smash', side:'left', explanation:'Aids in cognitive reframing and stress relief by actively destroying negative associations.', Component:WordSmash      },
+  { id:'processing_grid', name:'Processing Grid', emoji:'🎯', color:'#a78bfa', tagline:'Schulte Table + Lines',  mechanic:'Connect 1-25',   side:'left', explanation:'Tests visual scanning speed and resilience to environmental distraction (brain fog).', Component:ProcessingGrid },
+  { id:'memory_pulse',    name:'Memory Pulse',    emoji:'🧠', color:'#a78bfa', tagline:'Test working memory',    mechanic:'Sequence repeat',side:'right', explanation:'Quantifies working memory capacity and sequence retention capabilities.', Component:MemoryPulse    },
+  { id:'perception_probe',name:'Perspective',     emoji:'👁️', color:'#5eead4', tagline:'Cognitive rigidity test', mechanic:'Illusion switch', side:'right', explanation:'Detects cognitive rigidity by measuring how quickly you switch visual perspectives.', Component:PerceptionProbe    },
+  { id:'overcharge_protocol', name:'Overcharge Protocol', emoji:'⚡', color:'#ff2052', tagline:'Risk vs Reward (BART)', mechanic:'Hold to charge', side:'right', explanation:'Evaluates dopamine-seeking risk behavior versus anxiety-driven risk aversion.', Component:OverchargeProtocol },
 ];
 
 // Physics helpers
@@ -1574,7 +1972,7 @@ export default function CognitiveForge() {
                     <span style={{fontSize:22}}>{activeGameDef?.emoji}</span>
                     <div>
                       <p style={{fontSize:14,fontWeight:800,color:'var(--text-1)',letterSpacing:'-0.02em'}}>{activeGameDef?.name}</p>
-                      <p style={{fontSize:9.5,color:'var(--text-3)'}}>Interaction data feeds your behavioral health profile</p>
+                      <p style={{fontSize:9.5,color:'var(--text-3)'}}>{activeGameDef?.explanation || 'Interaction data feeds your behavioral health profile'}</p>
                     </div>
                   </div>
                   <button onClick={()=>setActiveGame(null)} style={{width:30,height:30,borderRadius:'50%',background:'rgba(255,255,255,0.06)',border:'1px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--text-3)',cursor:'pointer'}}>

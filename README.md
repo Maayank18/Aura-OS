@@ -1,658 +1,185 @@
-# AuraOS — Your Mental Safety Net
+# AuraOS
 
-AuraOS shifts mental health technology from **passive tracking** to **active, real-time intervention**. When a user is in a panic attack or ADHD executive dysfunction spiral, they cannot navigate complex UIs or type structured input — so we built an app that catches them exactly where they are.
+<div align="center">
 
----
+![AuraOS Banner](docs/architecture-diagram.png)
 
-## The problem
+[![React](https://img.shields.io/badge/React-18.2.0-blue.svg?logo=react&logoColor=white)](https://react.dev/)
+[![Node.js](https://img.shields.io/badge/Node.js-20.x-green.svg?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-emerald.svg?logo=mongodb&logoColor=white)](https://www.mongodb.com/)
+[![Gemini](https://img.shields.io/badge/Google_Gemini-Flash-darkblue.svg?logo=google&logoColor=white)](https://deepmind.google/technologies/gemini/)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Hackathon](https://img.shields.io/badge/Status-Samsung_Solve_for_Tomorrow_%2F_Vihaan_DTU_9.0-orange.svg)](#)
 
-Current mental health apps are overwhelmingly passive. They ask you to fill out forms, track symptoms, and read dashboards — precisely when you're least capable of doing any of that. There is no "digital safety net."
+<h3>The Biology-First Somatic Operating Layer for Proactive Mental Resilience.</h3>
 
-## Our solution
-
-Four intervention modes, each targeting a different failure state:
-
-| Mode | Trigger | Mechanism |
-|---|---|---|
-| **Aura Voice** | Racing thoughts, can't articulate | Voice AI that reads acoustic emotion, not just words |
-| **Cognitive Forge** | Panic, overwhelmed by worries | Physics-based worry destruction — literally drag fears into fire |
-| **Task Shatterer** | ADHD task paralysis, frozen | AI breaks goals into 2-minute micro-quests, shown one at a time |
-| **Aura Recovery Protocol** | Deep recovery & lifestyle planning | High-fidelity neuro-chemical diet and exercise plans based on clinical telemetry |
-| **Clinical RAG Intelligence** | Seeking grounded recovery steps | AI retrieves evidence-based nutrition and exercise recommendations using ChromaDB |
+*AuraOS is an open-source, Zero-UI somatic operating layer designed to bypass the cognitive barriers of traditional mental health trackers by mapping real-time biological state indicators (vocal cadence, kinetic stress, and executive paralysis) directly to frictionless micro-interventions. By shifting from reflective journaling to active, real-time physiological offloading, AuraOS catches users at their lowest capacity state to build durable psychological safety nets.*
 
 ---
 
-## Architecture
+[View API Contracts](docs/API_CONTRACTS.md) · [System Architecture](docs/structure.md)
 
-```
-aura-os/
-├── frontend/         React + Vite · Matter.js · Zustand · Framer Motion
-├── backend-node/     Express · LangChain · Gemini API · MongoDB
-├── backend-python/   FastAPI · Whisper · Groq · ElevenLabs · ChromaDB (Deepanshu)
-└── docs/             API_CONTRACTS.md · architecture diagram
-```
+</div>
 
-**Microservices rationale:** The Python backend runs a real-time ML audio pipeline (emotion recognition + Whisper STT). Keeping it separate from Node ensures a slow LLM inference call never blocks the physics canvas or task API. Each service is independently deployable.
+## 1. The "Systemic Breakage" (Why We Built This)
 
----
+Traditional mental health applications suffer from the **"Participation Paradox"**: they demand maximum active cognitive effort (such as typing structured journals, filling out long diagnostic forms, or navigating complex submenus) during acute panic attacks, sensory overloads, or ADHD freezes when a user's executive function capacity is at absolute zero. These apps function as passive, retrospective logs rather than active somatic safety nets.
 
-## Features deep dive
+Furthermore, a significant **"Context Gap"** exists between when a crisis occurs and when it is documented. Retrospective tracking misses the critical physiological window where somatic grounding is effective, leading to poor clinical adherence and diagnostic blindspots.
 
-### 1. Aura Voice — Conversational Emotion AI
+AuraOS breaks this loop by separating *interaction* from *reflection*:
 
-The voice assistant adapts its **tone and response length** based on the acoustic character of your anxiety, not just your words.
-
-- **Frontend:** Web Audio API captures mic → `AnalyserNode` drives a 48-bar frequency visualizer → `ScriptProcessorNode` chunks PCM audio → WebSocket to Python
-- **Python (Deepanshu):** librosa/wav2vec extracts pitch/cadence → Whisper transcribes → Groq LLM generates persona-driven response → ElevenLabs TTS → base64 audio back to frontend
-- **Emotion modes:** `calm` · `mild_anxiety` · `high_anxiety` — each triggers different UI state, glow colors, and grounding prompts
-
-### 2. Cognitive Forge — Physics-Based Cognitive Offloading
-
-Turn the abstract chaos of anxiety into physical objects you can destroy.
-
-- **User:** Types a stream-of-consciousness worry dump (no structure required)
-- **Gemini Flash:** Extracts discrete worries into `[{ worry, weight }]` JSON — `weight` (1–10) maps directly to block width in the physics world
-- **Matter.js:** Blocks spawn above the canvas with random torque and fall under gravity. User drags them into a fireplace sensor zone at the bottom
-- **On destroy:** Particle burst, DB update, worry marked `destroyed` in MongoDB
-
-### 3. Task Shatterer — Executive Function Engine
-
-Solves ADHD task paralysis by destroying monolithic goals.
-
-- **User:** Types a scary task ("Build the MERN backend")
-- **LangChain + Groq:** `withStructuredOutput(ZodSchema)` forces the LLM into validated JSON — not prompt parsing, actual tool-call schema enforcement
-- **Frontend:** Flashcard UI — only the **first step** is shown. Clicking "Done ✓" fires `canvas-confetti` and advances to the next step. All quests done → full confetti celebration
-- **Focus Anchor:** Brown noise loops via HTML5 Audio while a task is active (scientifically backed ADHD focus aid)
-- **Body Double:** `document.visibilityState` polling — if user switches tabs for > 8 seconds, a fullscreen SVG avatar appears: *"Hey — we were in a focus block."*
-
-### 4. Aura Recovery Protocol — Personalized Neuro-Support
-
-The latest addition to the Clinical suite. Based on your session telemetry (vocal stress, task completion, worry weights), Aura prescribes a highly specific recovery plan.
-
-- **Neuro-Diet Plan:** Specific nutritional interventions (e.g., Magnesium-rich foods for anxiety, Dopamine-supportive snacks for ADHD).
-- **Somatic Exercise:** Prescribed physical activities targeted at your current neuro-chemical state (Zone 2 cardio, progressive muscle relaxation).
-- **Confidence Anchors:** Psychologically grounding statements to break the freeze.
-- **Strict Grounding:** All protocols are grounded in Nutritional Psychiatry and Exercise Physiology rules.
-
-### 5. Clinical RAG Intelligence — Evidence-Based Knowledge
-
-A personalized, scientifically-backed recovery system engineered for users needing grounded, clinical advice.
-
-- **Knowledge Base:** ChromaDB vector store ingests scientific papers on Nutritional Psychiatry and Exercise Physiology.
-- **RAG Engine:** Groq LLM queries the vector store, augmenting the prompt with condition (ADHD/Anxiety), severity, and baseline arousal scores.
-- **Frontend Integration:** Fast rendering and tailored protocol creation with polished framer-motion transitions for readability.
+| Interaction Vector | Traditional Passive Trackers | AuraOS Active Interventions |
+| :--- | :--- | :--- |
+| **Cognitive Load** | High. Requires structured semantic entry and manual data input. | **Zero-UI.** Adapts to voice velocity and erratic mouse/touch kinetics. |
+| **Timing & State** | Retrospective. Captures logs hours after the crisis has passed. | **Real-Time.** Intervenes immediately during acute physiological spikes. |
+| **User State Adherence** | Near-zero during panic freezes or executive dysfunction. | **High.** Frictionless physics and micro-tasks act as immediate somatic releases. |
+| **Observer Integration** | Isolated. No automated escalation to physical guardians. | **Proactive.** 3-key verified alerts notify emergency **Guardians** instantly. |
 
 ---
 
-## Tech stack
+## 2. Core Ecosystem & Features
 
-| Layer | Technology | Why |
-|---|---|---|
-| Frontend | React 18 + Vite | Fast HMR, minimal config |
-| Physics | Matter.js | 2D rigid body, sensor zones, mouse constraints |
-| State | Zustand | Lighter than Redux, perfect for hackathon pace |
-| Backend AI orchestration | LangChain + Groq | `withStructuredOutput` = validated JSON guaranteed |
-| Worry extraction | Google Gemini Flash | Long context + fast for stream-of-consciousness text |
-| Database | MongoDB Atlas | Flexible schema for evolving worry/task models |
-| Audio ML | FastAPI + Whisper + XGBoost + RF | GPU-accelerated ensemble ML pipeline |
-| TTS | ElevenLabs | Emotionally nuanced voice output |
+AuraOS integrates B2C somatic tools with a B2B zero-trust enterprise support framework to establish a continuous feedback loop between clients, employees, and wellness committees.
+
+### 2.1 B2C Client Engine
+
+*   🗣️ **Aura Voice (Conversational Emotion AI):** A JS-native speech-to-text velocity and semantic analysis pipeline that calculates average words-per-minute (WPM) and volume dynamics in real time. It routes these metrics and transcript chunks to Google Gemini, adapting grounding response length and tone according to the user's **Critical Escalation Index ($CEI$)**.
+*   🧱 **Cognitive Forge (Physics-Based Somatic Offloading):** Turns abstract mental weight into 2D physical bodies in a Matter.js rigid-body physics world. Unstructured worry streams are mapped via Gemini Flash to discrete worry nodes with weighted mass and size. Users physically drag and fling these blocks into a fireplace sensor zone, triggering a particle burst and database synchronization.
+*   ⚡ **Task Shatterer (Executive Function Engine):** Overcomes ADHD task paralysis by decomposing intimidating goals into single, 2-minute actionable micro-quests using LangChain's Zod structured outputs. Features a continuous brown noise audio loop to optimize neural focus and a tab visibility tracker that prompts a "Body Double" avatar to re-engage the user if they navigate away for more than 8 seconds.
+
+### 2.2 B2B Enterprise Shield & Guardians
+
+*   🛡️ **Dual-Tier Onboarding:** Segregates public B2C client setups from corporate B2B employee registrations, binding employees to verified cohorts and strict internal schemas.
+*   👁️ **Stateless Welfare Portals:** Provides real-time, SWR-secured telemetry dashboards (showing mood indexes and stress alerts) to designated Guardians and Welfare Committees. Operates on a zero-trust model: reviewer sessions are stateless, requiring a valid alphanumeric ID, cohort dropdown validation, and temporary security tokens to prevent session hijacking.
 
 ---
 
-## Setup
+## 3. System Architecture (The Monorepo)
 
-### Prerequisites
-- Node.js 20+
-- Python 3.11+
-- MongoDB Atlas account (free tier works)
-- API keys: Gemini, Groq, ElevenLabs
+AuraOS is structured as a 100% JavaScript monorepo to ensure zero-dependency boundary bloat and keep local network latency minimal:
 
-### 1. Clone and install
-
-```bash
-git clone <repo-url> && cd aura-os
-
-# Install root + all Node services in one command
-npm install && npm run install:all
+```
+Aura-OS/
+├── frontend/                  # React 18 + Vite SPA client
+│   ├── src/
+│   │   ├── components/        # Interactive canvas, visualizers, and portals
+│   │   ├── hooks/             # Matter.js physics managers & Web Audio stream hooks
+│   │   ├── store/             # Zustand global state store (flat session schemas)
+│   │   └── services/          # Central API gateway wrappers (api.js, authApi.js)
+│   └── Dockerfile             # SPA build & Nginx hosting setup
+├── backend-node/              # Express orchestration backend
+│   ├── src/
+│   │   ├── controllers/       # Clinical metrics, auth flow, and RAG handlers
+│   │   ├── models/            # Mongoose schemas & database discriminators
+│   │   └── services/          # Adapters for LangChain, Gemini, and Twilio
+│   ├── server.js              # Server entry point
+│   └── Dockerfile             # Node application build script
+├── docs/                      # Architectural specs & API contracts
+├── docker-compose.yml         # Local container orchestrator
+└── package.json               # Root monorepo coordinator
 ```
 
-### 2. Configure environment
+### 3.1 Zero-Trust Data Isolation (Mongoose Discriminators)
 
-```bash
-# backend-node
-cp backend-node/.env.example backend-node/.env
-# → Fill in GEMINI_API_KEY, GROQ_API_KEY, MONGO_URI
+All telemetry and clinical data are anonymized and bound to a dynamic `userStateId` generated during intake. To enforce clean data isolation without the overhead of multiple databases, the system utilizes **Mongoose Discriminators** (`accountType`) to differentiate `CLIENT`, `EMPLOYEE`, `GUARDIAN`, and `COMMITTEE` document structures within a single unified `User` collection. This prevents cross-role authorization leaks at the schema level:
 
-# backend-python
-cp backend-python/.env.example backend-python/.env
-# → Fill in GROQ_API_KEY, ELEVENLABS_KEY
+```javascript
+// Schema Discriminator Mapping
+export const ClientUserModel = UserModel.discriminator('CLIENT', new Schema({
+  guardianId: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+  patientIntake: { type: Schema.Types.Mixed, default: null },
+  dailyMoodLogs: { type: [MoodLogSchema], default: [] }
+}));
+
+export const EmployeeUserModel = UserModel.discriminator('EMPLOYEE', new Schema({
+  employeeId: { type: String, required: true, unique: true, sparse: true },
+  cohort: { type: String, enum: ['ENGINEERING', 'MARKETING', 'OPERATIONS', 'PRODUCT', 'HR'], required: true }
+}));
 ```
 
-### 3. Generate brown noise audio
+### 3.2 System Sequence Diagram
 
-```bash
-node scripts/generate-brown-noise.mjs
-# → Writes frontend/public/brown-noise.mp3
-```
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Client as Client App (React)
+    participant Store as Zustand Store
+    participant API as Node.js Backend (Express)
+    participant LLM as Google Gemini / LangChain
+    actor Guardian as Guardian Portal
 
-### 4. Run
-
-```bash
-# Start Node backend + frontend together (recommended)
-npm run dev
-
-# Or separately:
-npm run dev:node      # backend-node on :5001
-npm run dev:frontend  # frontend on :5173
-
-# Python backend (Audio ML service)
-cd backend-python && uvicorn app.main:app --reload --port 8000
+    Client->>Store: Captures Somatic Data (Audio/Kinetics)
+    Store->>API: Dispatches Payload (WPM, Worry Blocks, Stress Spikes)
+    API->>LLM: Computes Clinical Triage & Structured Breakdown
+    LLM-->>API: Returns Validated JSON Schema
+    API->>API: Persists telemetry (Sorted compound indexes)
+    API-->>Client: Renders groundings & Confetti explosion
+    API->>Guardian: Populates Real-time Telemetry Dashboard (Stateless Verification)
 ```
 
 ---
 
-## 🚀 Easy Start Guide: Python Backend (For Normal Persons)
+## 4. Local Setup & Installation
 
-The Python backend handles the voice emotion recognition. Here is how to set it up step-by-step:
+Follow these steps to spin up the monorepo locally.
 
-### 1. Install Python
-If you don't have it, download and install **Python 3.11 or 3.12** from [python.org](https://www.python.org/downloads/). 
-> [!IMPORTANT]
-> During installation, make sure to check the box that says **"Add Python to PATH"**.
+### 4.1 Prerequisites
+- **Node.js** v20.x or higher
+- **MongoDB** local instance or MongoDB Atlas Connection URI
+- **Google Gemini API Key**
 
-### 2. Open your Terminal
-- **Windows:** Press the `Win` key, type `cmd`, and press Enter.
-- **Mac/Linux:** Open the `Terminal` app.
+### 4.2 Installation
 
-### 3. Navigate to the project
-Type this command (change the path to where you saved the folder):
-```bash
-cd path/to/Aura-OS/backend-python
-```
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/Maayank18/Aura-OS.git
+    cd Aura-OS
+    ```
 
-### 4. Create a "Private" Environment
-This keeps the project dependencies separate from your computer.
-```bash
-python -m venv venv
-```
+2.  **Install dependencies across the monorepo:**
+    The root `package.json` coordinates child installations:
+    ```bash
+    npm run install:all
+    ```
 
-### 5. Activate the Environment
-- **Windows:** `venv\Scripts\activate`
-- **Mac/Linux:** `source venv/bin/activate`
+3.  **Configure Environment Variables:**
+    Create a `.env` file in the `backend-node/` directory:
+    ```bash
+    cp backend-node/.env.example backend-node/.env
+    ```
+    Populate the following variables:
+    ```env
+    PORT=5001
+    MONGO_URI=mongodb+github_url_or_atlas_path/auraos
+    GEMINI_API_KEY=your_gemini_api_key_here
+    JWT_SECRET=your_jwt_signing_secret_here
+    FRONTEND_URL=http://localhost:5173
+    
+    # Twilio (Required for live SMS/WhatsApp Guardian Triage Alerts)
+    TWILIO_ACCOUNT_SID=your_twilio_sid
+    TWILIO_AUTH_TOKEN=your_twilio_auth_token
+    TWILIO_PHONE_NUMBER=your_twilio_phone
+    ```
 
-### 6. Install the dependencies
-This might take a few minutes as it downloads the AI and audio processing tools.
-```bash
-pip install -r requirements.txt
-```
+4.  **Generate Brown Noise Assets:**
+    Compile the ADHD grounding sound wave asset:
+    ```bash
+    node scripts/generate-brown-noise.mjs
+    ```
 
-### 7. Set your API Key
-1. In the `backend-python` folder, copy `.env.example` and rename it to `.env`.
-2. Open `.env` in Notepad and paste your **GROQ_API_KEY**.
-
-### 8. Start the server!
-```bash
-uvicorn app.main:app --reload --port 8000
-```
-You should see a message saying "Application startup complete."
-
----
-
-## 🐋 Easy Start Guide: Docker (One-Click Setup)
-If you have **Docker Desktop** installed, you can start the *entire* app (Frontend + Node + Python) with one command from the main `Aura-OS` folder:
-
-```bash
-docker-compose up --build
-```
-This is the recommended way to run the full system without manually installing dependencies.
-
----
-
-### 5. Verify before demo
-
-```bash
-node scripts/smoke-test.mjs
-# Runs all 12 API endpoints and prints PASS/FAIL table
-```
-
-Open `http://localhost:5173`
+5.  **Launch the System:**
+    Run both frontend and backend concurrently from the root directory:
+    ```bash
+    npm run dev
+    ```
+    - **Frontend Client:** [http://localhost:5173](http://localhost:5173)
+    - **Backend Node API:** [http://localhost:5001](http://localhost:5001)
 
 ---
 
-## API reference
-
-See [`docs/API_CONTRACTS.md`](docs/API_CONTRACTS.md) for the full request/response contract for all endpoints — including the WebSocket protocol for Deepanshu's Python service.
-
----
-
-## Team
-
-| Name | Domain |
-|---|---|
-| Mayank | Frontend · backend-node · GenAI pipeline |
-| Deepanshu | backend-python · Audio ML · Speech emotion |
-
----
-
-## Impact
-
-AuraOS is built for the **1 in 5 people** who experience anxiety disorders and the estimated **2.5–4% of adults** with ADHD. The core design principle: **meet the user where they are**, not where the app expects them to be.
-
-When someone is in crisis, they cannot navigate. So we made navigation unnecessary.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# AuraOS API Contracts
-> **Source of truth** for the interface between backend-node (Mayank) ↔ frontend (Mayank) ↔ backend-python (Deepanshu).
-> Last updated: AuraOS Beta
-
----
-
-## Base URLs
-
-| Service | Local URL | Owner |
-|---|---|---|
-| backend-node (Express) | `http://localhost:5001` | Mayank |
-| backend-python (FastAPI) | `http://localhost:8000` | Deepanshu |
-| frontend (Vite) | `http://localhost:5173` | Mayank |
-
----
-
-## 1. Session Management (`/api/state`)
-
-### `POST /api/state/init`
-Initialize or resume a user session. Call this on app load.
-
-**Request**
-```json
-{
-  "userId": "uuid-string-or-omit-for-new-user"
-}
-```
-
-**Response**
-```json
-{
-  "success": true,
-  "userId": "generated-or-provided-uuid",
-  "sessionsCount": 3,
-  "isReturning": true,
-  "lastActive": "2024-01-15T10:30:00.000Z"
-}
-```
-
-### `GET /api/state/:userId`
-Get the full user state summary (for the dashboard / home screen).
-
-**Response**
-```json
-{
-  "success": true,
-  "exists": true,
-  "userId": "abc-123",
-  "lastActive": "2024-01-15T10:30:00.000Z",
-  "stats": {
-    "worriesDestroyed": 12,
-    "tasksCompleted": 4,
-    "totalSessions": 7
-  },
-  "activeTask": {
-    "id": "task-uuid",
-    "originalTask": "Build the MERN backend",
-    "progress": 37,
-    "currentQuest": {
-      "id": 3,
-      "action": "Open VS Code and create a new file called server.js",
-      "tip": "Just open it. That's all. One thing.",
-      "duration_minutes": 2,
-      "completed": false
-    }
-  }
-}
-```
-
-### `DELETE /api/state/:userId`
-Wipe all user data (demo reset button).
-
----
-
-## 2. Cognitive Forge (`/api/forge`)
-
-### `POST /api/forge/extract` ⭐ Core Feature 2 Endpoint
-Sends messy worry text to Gemini, returns structured worry blocks for Matter.js.
-
-**Request**
-```json
-{
-  "text": "I'm so behind on my project and also my mom is sick and I forgot to pay rent again and I don't even know if I'm good enough for this job",
-  "userId": "abc-123"
-}
-```
-
-**Response**
-```json
-{
-  "success": true,
-  "count": 4,
-  "worries": [
-    {
-      "id": 1,
-      "uuid": "physics-body-uuid",
-      "worry": "project deadline slipping",
-      "weight": 8,
-      "status": "active"
-    },
-    {
-      "id": 2,
-      "uuid": "physics-body-uuid-2",
-      "worry": "mom's health",
-      "weight": 9,
-      "status": "active"
-    },
-    {
-      "id": 3,
-      "uuid": "physics-body-uuid-3",
-      "worry": "missed rent payment",
-      "weight": 6,
-      "status": "active"
-    },
-    {
-      "id": 4,
-      "uuid": "physics-body-uuid-4",
-      "worry": "job competence doubts",
-      "weight": 7,
-      "status": "active"
-    }
-  ]
-}
-```
-
-> **Frontend contract**: `uuid` maps 1:1 to the Matter.js body label.
-> `weight` (1-10) → body width (e.g. `width = 80 + weight * 12`).
-
-### `POST /api/forge/destroy`
-Called when user drags a worry block into the Fireplace sensor zone.
-
-**Request**
-```json
-{
-  "userId": "abc-123",
-  "worryId": "physics-body-uuid"
-}
-```
-
-**Response**
-```json
-{
-  "success": true,
-  "message": "Worry destroyed. Let it go.",
-  "worryId": "physics-body-uuid"
-}
-```
-
-### `POST /api/forge/vault`
-Save a worry for later reflection instead of destroying it.
-
-**Request**
-```json
-{
-  "userId": "abc-123",
-  "worryId": "physics-body-uuid",
-  "worry": "project deadline slipping",
-  "weight": 8
-}
-```
-
-### `GET /api/forge/vault/:userId`
-Retrieve all vaulted (saved) worries.
-
-**Response**
-```json
-{
-  "success": true,
-  "count": 2,
-  "vault": [
-    {
-      "id": "uuid",
-      "worry": "project deadline slipping",
-      "weight": 8,
-      "status": "vaulted",
-      "createdAt": "2024-01-15T10:30:00.000Z"
-    }
-  ]
-}
-```
-
-### `DELETE /api/forge/vault/:userId/:worryId`
-Remove a specific worry from the vault.
-
----
-
-## 3. Task Shatterer (`/api/shatter`)
-
-### `POST /api/shatter/breakdown` ⭐ Core Feature 3 Endpoint
-Sends a scary monolithic task to LangChain/Groq, returns ordered micro-quests.
-
-**Request**
-```json
-{
-  "task": "Build the complete MERN backend for AuraOS",
-  "userId": "abc-123"
-}
-```
-
-**Response**
-```json
-{
-  "success": true,
-  "taskId": "task-uuid",
-  "originalTask": "Build the complete MERN backend for AuraOS",
-  "totalQuests": 6,
-  "firstQuest": {
-    "id": 1,
-    "action": "Open your terminal and type: mkdir aura-os && cd aura-os",
-    "tip": "You're already doing it. Just one command.",
-    "duration_minutes": 2,
-    "completed": false
-  },
-  "microquests": [
-    {
-      "id": 1,
-      "action": "Open your terminal and type: mkdir aura-os && cd aura-os",
-      "tip": "You're already doing it. Just one command.",
-      "duration_minutes": 2,
-      "completed": false
-    },
-    {
-      "id": 2,
-      "action": "Type: npm init -y and press Enter",
-      "tip": "One command. It'll do the rest for you.",
-      "duration_minutes": 2,
-      "completed": false
-    }
-  ]
-}
-```
-
-> **Frontend contract**: On load, only display `firstQuest`.
-> After clicking "Done ✓", call `/complete` to get `nextQuest`.
-
-### `POST /api/shatter/complete`
-Mark a micro-quest as done. Returns the next quest and progress.
-
-**Request**
-```json
-{
-  "userId": "abc-123",
-  "taskId": "task-uuid",
-  "questId": 1
-}
-```
-
-**Response**
-```json
-{
-  "success": true,
-  "questId": 1,
-  "taskComplete": false,
-  "questsCompleted": 1,
-  "totalQuests": 6,
-  "progress": 17,
-  "nextQuest": {
-    "id": 2,
-    "action": "Type: npm init -y and press Enter",
-    "tip": "One command. It'll do the rest for you.",
-    "duration_minutes": 2,
-    "completed": false
-  },
-  "message": "Quest 1 done. 5 left."
-}
-```
-
-> When `taskComplete: true` → frontend shows full confetti + dopamine animation.
-
-### `POST /api/shatter/abandon`
-Gracefully set aside the active task.
-
-**Request**
-```json
-{
-  "userId": "abc-123",
-  "taskId": "task-uuid"
-}
-```
-
-### `GET /api/shatter/active/:userId`
-Check for an active task on page load (session resume).
-
-**Response**
-```json
-{
-  "success": true,
-  "activeTask": { "...full task object..." },
-  "currentQuest": { "...next incomplete quest..." }
-}
-```
-
-### `GET /api/shatter/history/:userId`
-Completed and abandoned task history.
-
----
-
-## 4. Python Backend Contract (Deepanshu → Frontend)
-
-> **Note**: This section documents Deepanshu's FastAPI endpoints for the frontend's `useAudioStream.js` hook.
-
-### WebSocket `ws://localhost:8000/ws/audio`
-Bidirectional audio stream for Feature 1 (Conversational Emotion AI).
-
-**Frontend sends**: Raw `Float32Array` audio chunks via WebSocket binary frames.
-
-**Frontend receives**: JSON messages
-```json
-{
-  "type": "transcript",
-  "text": "I'm feeling really overwhelmed right now"
-}
-```
-```json
-{
-  "type": "response",
-  "text": "I hear you. Let's take one breath together.",
-  "emotion": "high_anxiety",
-  "tts_audio": "<base64-encoded-audio>"
-}
-```
-```json
-{
-  "type": "emotion_update",
-  "emotion": "high_anxiety",
-  "pitch_score": 0.82,
-  "cadence_score": 0.91
-}
-```
-
----
-
-## Error Response Format
-
-All endpoints return this shape on error:
-
-```json
-{
-  "success": false,
-  "error": "Human-readable error message"
-}
-```
-
-| Status Code | Meaning |
-|---|---|
-| 400 | Bad request (missing/invalid input) |
-| 404 | Resource not found |
-| 409 | Conflict (e.g. quest already completed) |
-| 500 | Server/AI error |
-
----
-
-## Quick Test Commands (curl)
-
-```bash
-# Health check
-curl http://localhost:5001/health
-
-# Init session
-curl -X POST http://localhost:5001/api/state/init \
-  -H "Content-Type: application/json" \
-  -d '{"userId": "test-user-123"}'
-
-# Extract worries (Feature 2)
-curl -X POST http://localhost:5001/api/forge/extract \
-  -H "Content-Type: application/json" \
-  -d '{"text": "I cant stop worrying about my exams and my relationship and also money", "userId": "test-user-123"}'
-
-# Break down a task (Feature 3)
-curl -X POST http://localhost:5001/api/shatter/breakdown \
-  -H "Content-Type: application/json" \
-  -d '{"task": "Study for my physics exam tomorrow", "userId": "test-user-123"}'
-```
+## 5. Future Scope
+
+*   ⌚ **Galaxy Wearable TinyML Integration:** Compiling lightweight TensorFlow Lite models to run directly on wearable edge processors, parsing skin temperature and heart rate variability (HRV) offsets straight into the local State Store.
+*   📸 **Contactless rPPG Web-Camera Tracking:** Extracting pulse wave signals from the user's facial webcam feed (photoplethysmography) to detect autonomic nervous system spikes without physical sensor arrays.
+*   🧠 **Predictive Burnout Modeling:** Building temporal recurrent networks to forecast employee burnout risks 72 hours prior to a potential freeze state, alerting welfare committees through privacy-compliant secure channels.
