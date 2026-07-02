@@ -47,7 +47,7 @@ app.use((req, res) => res.status(404).json({ success: false, error: `Route not f
 app.use(globalErrorHandler);
 
 const start = async () => {
-  const requiredEnv = ['MONGO_URI', 'GEMINI_API_KEY'];
+  const requiredEnv = ['MONGO_URI'];
   const missingEnv = requiredEnv.filter((env) => !process.env[env]);
   if (missingEnv.length > 0) {
     console.error(`[Fatal] Missing required environment variables: ${missingEnv.join(', ')}`);
