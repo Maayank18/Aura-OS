@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://your-render-backend-url.onrender.com/api/:path*"
+      "destination": "https://aura-os-backend-8njg.onrender.com/api/:path*"
     },
     {
       "source": "/(.*)",
