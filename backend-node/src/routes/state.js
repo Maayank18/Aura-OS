@@ -8,10 +8,11 @@ import {
 } from '../controllers/stateCtrl.js';
 
 const router = express.Router();
+import { requireAuth } from '../middleware/auth.js';
 
-router.post('/init', asyncHandler(initSessionHandler));
-router.patch('/:userId/intake', asyncHandler(patchIntakeHandler));  // must be before /:userId GET
-router.get('/:userId', asyncHandler(getStateHandler));
-router.delete('/:userId', asyncHandler(wipeStateHandler));
+router.post('/init', requireAuth, asyncHandler(initSessionHandler));
+router.patch('/:userId/intake', requireAuth, asyncHandler(patchIntakeHandler));
+router.get('/:userId', requireAuth, asyncHandler(getStateHandler));
+router.delete('/:userId', requireAuth, asyncHandler(wipeStateHandler));
 
 export default router;

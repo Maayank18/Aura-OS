@@ -330,7 +330,9 @@ export const logVocalStressHandler = async (req, res, next) => {
       if (risk.atRisk && risk.riskLevel === 'acute-distress') {
         console.log(`[Triage] Auto-alert triggered for ${userId}: ${risk.riskLevel}`);
       }
-    }).catch(() => {});
+    }).catch((err) => {
+      console.error(`[Triage] Error evaluating burnout risk for ${userId}:`, err);
+    });
 
     res.json({ success: true });
   } catch (err) {

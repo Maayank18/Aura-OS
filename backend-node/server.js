@@ -47,10 +47,18 @@ app.use((req, res) => res.status(404).json({ success: false, error: `Route not f
 app.use(globalErrorHandler);
 
 const start = async () => {
+  const requiredEnv = ['MONGO_URI', 'GEMINI_API_KEY'];
+  const missingEnv = requiredEnv.filter((env) => !process.env[env]);
+  if (missingEnv.length > 0) {
+    console.error(`[Fatal] Missing required environment variables: ${missingEnv.join(', ')}`);
+    process.exit(1);
+  }
+
   try {
     await connectDB();
   } catch (err) {
-    console.error('[DB] connectDB threw — server will start without DB:', err.message);
+    console.error('[DB] Fatal: connectDB failed to connect. Ensure MongoDB is running and MONGO_URI is correct:', err.message);
+    process.exit(1);
   }
 
   app.listen(PORT, () => {

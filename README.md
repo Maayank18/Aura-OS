@@ -67,16 +67,13 @@ Aura-OS/
 │   │   ├── hooks/             # Matter.js physics managers & Web Audio stream hooks
 │   │   ├── store/             # Zustand global state store (flat session schemas)
 │   │   └── services/          # Central API gateway wrappers (api.js, authApi.js)
-│   └── Dockerfile             # SPA build & Nginx hosting setup
 ├── backend-node/              # Express orchestration backend
 │   ├── src/
 │   │   ├── controllers/       # Clinical metrics, auth flow, and RAG handlers
 │   │   ├── models/            # Mongoose schemas & database discriminators
 │   │   └── services/          # Adapters for LangChain, Gemini, and Twilio
-│   ├── server.js              # Server entry point
-│   └── Dockerfile             # Node application build script
+│   └── server.js              # Server entry point
 ├── docs/                      # Architectural specs & API contracts
-├── docker-compose.yml         # Local container orchestrator
 └── package.json               # Root monorepo coordinator
 ```
 

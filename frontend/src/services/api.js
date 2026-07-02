@@ -10,14 +10,20 @@ const API_TIMEOUT = 8_000;        // 8s  — DB + health endpoints
 
 const VISION_TIMEOUT = 60_000;
 
+import { getAuthToken } from './authApi.js';
+
 const req = async (method, path, body, timeoutMs = API_TIMEOUT) => {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const token = getAuthToken();
 
   try {
     const res = await fetch(`${BASE}${path}`, {
       method,
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
       signal: controller.signal,
       ...(body ? { body: JSON.stringify(body) } : {}),
     });

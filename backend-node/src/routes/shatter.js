@@ -10,12 +10,13 @@ import {
 } from '../controllers/shatterCtrl.js';
 
 const router = express.Router();
+import { requireAuth } from '../middleware/auth.js';
 
-router.post('/breakdown', asyncHandler(breakdownTaskHandler));
-router.post('/complete', asyncHandler(completeQuestHandler));
-router.post('/abandon', asyncHandler(abandonTaskHandler));
-router.post('/sync-timeline', asyncHandler(syncTimelineHandler));
-router.get('/active/:userId', asyncHandler(getActiveTaskHandler));
-router.get('/history/:userId', asyncHandler(getTaskHistoryHandler));
+router.post('/breakdown', requireAuth, asyncHandler(breakdownTaskHandler));
+router.post('/complete', requireAuth, asyncHandler(completeQuestHandler));
+router.post('/abandon', requireAuth, asyncHandler(abandonTaskHandler));
+router.post('/sync-timeline', requireAuth, asyncHandler(syncTimelineHandler));
+router.get('/active/:userId', requireAuth, asyncHandler(getActiveTaskHandler));
+router.get('/history/:userId', requireAuth, asyncHandler(getTaskHistoryHandler));
 
 export default router;
