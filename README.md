@@ -9,7 +9,7 @@
 [![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-emerald.svg?logo=mongodb&logoColor=white)](https://www.mongodb.com/)
 [![Gemini](https://img.shields.io/badge/Google_Gemini-Flash-darkblue.svg?logo=google&logoColor=white)](https://deepmind.google/technologies/gemini/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Hackathon](https://img.shields.io/badge/Status-Samsung_Solve_for_Tomorrow_%2F_Vihaan_DTU_9.0-orange.svg)](#)
+
 
 <h3>The Biology-First Somatic Operating Layer for Proactive Mental Resilience.</h3>
 
