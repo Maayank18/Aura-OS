@@ -3,6 +3,22 @@
   <h1>AuraOS</h1>
   <p><b>The Biology-First Somatic Operating Layer</b></p>
   <p><i>A frictionless, ambient wellness system for cognitive overload, ADHD freeze, and burnout.</i></p>
+
+![AuraOS Banner](docs/architecture-diagram.png)
+
+[![React](https://img.shields.io/badge/React-18.2.0-blue.svg?logo=react&logoColor=white)](https://react.dev/)
+[![Node.js](https://img.shields.io/badge/Node.js-20.x-green.svg?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-emerald.svg?logo=mongodb&logoColor=white)](https://www.mongodb.com/)
+[![Gemini](https://img.shields.io/badge/Google_Gemini-Flash-darkblue.svg?logo=google&logoColor=white)](https://deepmind.google/technologies/gemini/)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+<h3>The Biology-First Somatic Operating Layer for Proactive Mental Resilience.</h3>
+
+*AuraOS is an open-source, Zero-UI somatic operating layer designed to bypass the cognitive barriers of traditional mental health trackers by mapping real-time biological state indicators (vocal cadence, kinetic stress, and executive paralysis) directly to frictionless micro-interventions. By shifting from reflective journaling to active, real-time physiological offloading, AuraOS catches users at their lowest capacity state to build durable psychological safety nets.*
+
+---
+
+[View API Contracts](docs/API_CONTRACTS.md) · [System Architecture](docs/structure.md)
 </div>
 
 ---
@@ -58,3 +74,8 @@ Generates highly formal, neuroscience-backed PDF reports of a user's session, co
 
 ## 🛠️ Tech Stack & Architecture
 For a deep dive into the engineering, tech stack, and event-driven telemetry architecture, please see [architecture.md](./architecture.md).
+
+## 5. Future Scope
+*   ⌚ **Galaxy Wearable TinyML Integration:** Compiling lightweight TensorFlow Lite models to run directly on wearable edge processors, parsing skin temperature and heart rate variability (HRV) offsets straight into the local State Store.
+*   📸 **Contactless rPPG Web-Camera Tracking:** Extracting pulse wave signals from the user's facial webcam feed (photoplethysmography) to detect autonomic nervous system spikes without physical sensor arrays.
+*   🧠 **Predictive Burnout Modeling:** Building temporal recurrent networks to forecast employee burnout risks 72 hours prior to a potential freeze state, alerting welfare committees through privacy-compliant secure channels.
