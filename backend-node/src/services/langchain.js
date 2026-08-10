@@ -96,6 +96,7 @@ const makeModel = (schema, name, temp = 0.38) => {
       temperature: temp,
       apiKey: key,
       maxRetries: 2,
+      maxTokens: 1200,
       configuration: {
         baseURL: useOpenRouter ? 'https://openrouter.ai/api/v1' : 'https://api.groq.com/openai/v1',
         defaultHeaders: useOpenRouter ? {
@@ -485,7 +486,29 @@ The story must have exactly 7 scenes. 6 scenes should be of type 'text'. Exactly
 The quiz MUST test the user's working memory regarding a highly specific visual detail mentioned in a previous scene.
 Provide a 3-5 word image_prompt for EACH scene that accurately describes the visual setting so an AI image generator can render it.
 The background should be a valid CSS linear-gradient or radial-gradient string that matches the theme.
-Respond ONLY with the structured JSON.
+Respond ONLY with a JSON object in this exact format:
+{
+  "id": "unique_string",
+  "title": "Story Title",
+  "background": "linear-gradient(to bottom, #020c14, #001f3f)",
+  "scenes": [
+    {
+      "text": "Story text...",
+      "duration": 4000,
+      "image_prompt": "descriptive visual prompt",
+      "type": "text"
+    },
+    {
+      "text": "Quiz text...",
+      "duration": 5000,
+      "image_prompt": "descriptive visual prompt",
+      "type": "quiz",
+      "question": "What color was...?",
+      "options": ["Red", "Blue", "Green", "Yellow"],
+      "answer": "Red"
+    }
+  ]
+}
 `;
 
 export const generateFocusStory = async () => {
