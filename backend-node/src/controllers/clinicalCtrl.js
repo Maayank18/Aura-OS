@@ -8,6 +8,16 @@
 //   GET  /api/clinical/dashboard/:userId— Aggregated recharts-ready data
 //   POST /api/clinical/therapy-brief    — Generate 14-day clinical PDF brief
 
+// src/controllers/clinicalCtrl.js  🌟 NEW
+// Handles all clinical / observer-portal API calls.
+//
+// Routes:
+//   POST /api/clinical/trigger-alert    — Panic trigger from TaskShatter
+//   POST /api/clinical/vocal-stress     — Logged after each session
+//   POST /api/clinical/guardian         — Set / update guardian contact
+//   GET  /api/clinical/dashboard/:userId— Aggregated recharts-ready data
+//   POST /api/clinical/therapy-brief    — Generate 14-day clinical PDF brief
+
 import mongoose    from 'mongoose';
 import UserState   from '../models/UserState.js';
 import Patient     from '../models/Patient.js';
@@ -15,7 +25,7 @@ import Guardian    from '../models/Guardian.js';
 import AlertLog    from '../models/AlertLog.js';
 import ClinicalReport from '../models/ClinicalReport.js';
 import { ClientUserModel, GuardianUserModel } from '../models/User.js';
-import { generateGuardianBrief } from '../services/langchain.js';
+import { generateGuardianBrief, generateOrbSync, generateOrbChat, generateFocusStory } from '../services/langchain.js';
 import { sendGuardianAlert }     from '../services/twilio.js';
 import { sendGuardianReportEmail } from '../services/email.js';
 import { buildClinicalReportPdfBuffer } from '../services/reportPdf.js';
@@ -1143,5 +1153,84 @@ export const generateRecoveryProtocolHandler = async (req, res, next) => {
     });
   } catch (err) {
     next(err);
+  }
+};
+
+export const syncOrb = async (req, res, next) => {
+  try {
+    const { userId, role, activeTask, vocalArousal, emotion, recentEvent } = req.body;
+    // We could fetch additional context from UserState if needed, but the frontend
+    // payload usually provides enough live context for a quick 100ms sync.
+    const result = await generateOrbSync({
+      userId, role, activeTask, vocalArousal, emotion, recentEvent
+    });
+
+    res.json({
+      success: true,
+      message: result.message,
+      mode: result.mode
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const chatOrb = async (req, res, next) => {
+  try {
+    const { userId, message, history, context } = req.body;
+    const result = await generateOrbChat(message, history || [], context || {});
+
+    let user = null;
+    if (userId) {
+      try {
+        user = await UserState.findOne({ userId });
+        if (user && message) {
+          // 🌟 NEW: Log chat into telemetry so Guardian Reports read these insights!
+          await user.logVocalStress({
+            timestamp: new Date(),
+            emotion: result.stats?.emotion || 'calm',
+            arousalScore: result.stats?.arousal || 5,
+            taskContext: 'orb_chat',
+            transcriptChunk: `User: "${message}" | AI: "${result.reply}"`
+          });
+        }
+      } catch (e) {
+        console.warn('Failed to log Orb chat to telemetry:', e);
+      }
+    }
+
+    // Intercept SEND_REPORT intent
+    if (result.action === 'SEND_REPORT' && user) {
+      try {
+        if (user.guardian && (user.guardian.phone || user.guardian.email)) {
+          const mockBrief = {
+            executive_summary: "Patient requested a status report dispatch via Aura Command Center.",
+            actionable_protocol: "Check in with the patient at your earliest convenience."
+          };
+          // Fire off background dispatch
+          sendGuardianAlert(user.toObject(), mockBrief, "User Requested Report").catch(e => console.warn('Guardian alert failed:', e));
+        }
+      } catch (dbErr) {
+        console.warn('DB error while processing SEND_REPORT:', dbErr);
+      }
+    }
+
+    res.json({
+      success: true,
+      reply: result.reply,
+      action: result.action,
+      stats: result.stats
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const generateStoryHandler = async (req, res, next) => {
+  try {
+    const story = await generateFocusStory();
+    res.json({ success: true, story });
+  } catch (err) {
+    next(new AppError('Failed to generate dynamic story', 500));
   }
 };

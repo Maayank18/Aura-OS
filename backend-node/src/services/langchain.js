@@ -48,28 +48,74 @@ const GuardianBriefSchema = z.object({
   risk_level:        z.enum(['watch', 'pre-burnout', 'acute-distress']).describe('Clinical risk triage.'),
 });
 
+const OrbSyncSchema = z.object({
+  message: z.string().max(120).describe('A very short (1-2 sentences max) non-intrusive companion message. Tone depends on the context.'),
+  mode: z.enum(['gentle', 'focus', 'spike', 'guardian']).describe('The recommended visual/behavioral state of the orb based on telemetry.'),
+});
+
+const OrbChatSchema = z.object({
+  reply: z.string().describe('The AI response to the user. Keep it brief, supportive, and action-oriented.'),
+  action: z.enum(['NONE', 'SHOW_STATS', 'SEND_REPORT']).optional().describe('Set to SHOW_STATS if user asks about data/stats, or SEND_REPORT if they explicitly ask to notify their guardian.'),
+  stats: z.object({
+    arousal: z.number().nullable().optional(),
+    emotion: z.string().nullable().optional()
+  }).optional().describe('Include if action is SHOW_STATS, mirroring their current arousal and emotion.')
+});
+
 /* ── OpenRouter client factory ───────────────────────────────────────────── */
+const StoryGenerationSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  background: z.string().describe("A CSS gradient or background color matching the theme, e.g. 'linear-gradient(to bottom, #020c14, #001f3f)'"),
+  scenes: z.array(z.object({
+    text: z.string().describe("The story text for this scene (max 2 sentences)."),
+    duration: z.number().describe("Duration in milliseconds to show this scene (e.g. 4000)."),
+    image_prompt: z.string().describe("A highly descriptive 3-5 word visual prompt for this scene to generate an image (e.g. 'glowing green jellyfish deep ocean')."),
+    type: z.enum(['text', 'quiz']).describe("Most should be 'text'. ONE scene must be 'quiz'."),
+    question: z.string().optional().describe("If type is quiz, the question about a previous scene's specific visual detail."),
+    options: z.array(z.string()).optional().describe("If type is quiz, exactly 4 short options."),
+    answer: z.string().optional().describe("If type is quiz, the exact correct string from options.")
+  })).length(7)
+});
+
 const makeModel = (schema, name, temp = 0.38) => {
   try {
-    const groqKey = process.env.GROQ_API_KEY_SHATTER || process.env.GROQ_API_KEY;
-    const useGroq = !!groqKey;
-    const apiKey = useGroq ? groqKey : process.env.OPENROUTER_API_KEY; 
-    if (!apiKey) throw new Error('API_KEY is not set.');
+    const openRouterKeys = [
+      process.env.OPENROUTER_API_KEY,
+      process.env.OPENROUTER_API_KEY_2,
+      process.env.OPENROUTER_API_KEY_3
+    ].filter(Boolean);
     
-    const llm = new ChatOpenAI({
-      modelName: useGroq ? (process.env.GROQ_MODEL || 'llama-3.1-8b-instant') : (process.env.OPENROUTER_MODEL || 'openai/gpt-4o-mini'),
+    const groqKey = process.env.GROQ_API_KEY_SHATTER || process.env.GROQ_API_KEY;
+    const useOpenRouter = openRouterKeys.length > 0;
+    
+    if (!useOpenRouter && !groqKey) throw new Error('API_KEY is not set.');
+    
+    const createLLM = (key) => new ChatOpenAI({
+      modelName: useOpenRouter ? (process.env.OPENROUTER_MODEL || 'openai/gpt-4o-mini') : (process.env.GROQ_MODEL || 'llama-3.1-8b-instant'),
       temperature: temp,
-      apiKey: apiKey,
+      apiKey: key,
+      maxRetries: 2,
       configuration: {
-        baseURL: useGroq ? 'https://api.groq.com/openai/v1' : 'https://openrouter.ai/api/v1',
-        defaultHeaders: {
-          'Authorization': `Bearer ${apiKey}`,
+        baseURL: useOpenRouter ? 'https://openrouter.ai/api/v1' : 'https://api.groq.com/openai/v1',
+        defaultHeaders: useOpenRouter ? {
           'HTTP-Referer': 'http://localhost:5173',
           'X-Title': 'AuraOS',
-        }
+        } : undefined
       }
     });
-    return llm.withStructuredOutput(schema, { name, method: "functionCalling" });
+
+    if (useOpenRouter && openRouterKeys.length > 1) {
+      // Use LangChain's fallback mechanism
+      const models = openRouterKeys.map(key => createLLM(key));
+      const primary = models[0].withStructuredOutput(schema, { name, method: "jsonMode" });
+      const fallbacks = models.slice(1).map(m => m.withStructuredOutput(schema, { name, method: "jsonMode" }));
+      return primary.withFallbacks({ fallbacks });
+    }
+
+    const apiKey = useOpenRouter ? openRouterKeys[0] : groqKey;
+    const primaryLlm = createLLM(apiKey);
+    return primaryLlm.withStructuredOutput(schema, { name, method: "jsonMode" });
   } catch (err) {
     console.warn('[LangChain] Model init failed:', err.message);
     return null;
@@ -105,23 +151,6 @@ const fallbackGuardianBrief = (data = {}) => {
   };
 };
 
-/* ── Clinical Knowledge Ingestion ────────────────────────────────────────── */
-
-const loadClinicalKnowledge = () => {
-  try {
-    const kbDir = path.join(__dirname, '../clinical_knowledge');
-    if (!fs.existsSync(kbDir)) return '';
-    const files = fs.readdirSync(kbDir).filter(f => f.endsWith('.txt'));
-    let combinedContext = '';
-    for (const file of files) {
-      combinedContext += `[Source: ${file}]\n${fs.readFileSync(path.join(kbDir, file), 'utf-8')}\n\n`;
-    }
-    return combinedContext;
-  } catch (e) {
-    return '';
-  }
-};
-
 /* ── System Prompts ────────────────────────────────────────────────────────── */
 
 const STANDARD_SHATTER_PROMPT = `You are an ADHD executive function coach embedded in AuraOS.
@@ -135,7 +164,10 @@ ABSOLUTE RULES — VIOLATION = FAILURE:
 5. Each step = ONE single physical action completable in ~2 minutes.
 6. Start EVERY action with a strong imperative verb (Open, Type, Click, Write, Run, Create, Navigate, Copy, Paste).
 7. Tips must sound human and warm, ≤18 words. Tips should be about the TASK, not about feelings.
-8. If the task is vague, make reasonable assumptions and be specific anyway.`;
+8. If the task is vague, make reasonable assumptions and be specific anyway.
+
+OUTPUT FORMAT:
+Return a valid JSON object matching the requested schema.`;
 
 const INITIATION_COACH_PROMPT = `You are the Aura Initiation Coach — a Principal Engineer and neuro-inclusive AI designed for clinical task unblocking.
 The user selected a specific blocker. You MUST tailor the coaching and the task breakdown strictly to this blocker.
@@ -156,7 +188,10 @@ ENVIRONMENT STRATEGY:
 • meditation_first → acute overwhelm.
 • none → mild friction.
 
-MICROQUESTS: Step 1 MUST be cyan (easiest). Be hyper-specific to the user's task. Start with imperative verbs.`;
+MICROQUESTS: Step 1 MUST be cyan (easiest). Be hyper-specific to the user's task. Start with imperative verbs.
+
+OUTPUT FORMAT:
+Return a valid JSON object matching the requested schema.`;
 
 const GUARDIAN_BRIEF_PROMPT = `You are a Senior Medical Doctor in Neuroscience and Behavioral Health. You are writing a highly professional, clinical "Deep Diagnosis" session report for AuraOS.
 
@@ -186,7 +221,43 @@ STRICT DATA-GROUNDED RULES:
 STRICT RISK CLASSIFICATION:
 - watch: Mild stress, resilient recovery.
 - pre-burnout: Chronic sympathetic activation, declining executive performance.
-- acute-distress: Immediate neurological shutdown / crisis state detected.`;
+- acute-distress: Immediate neurological shutdown / crisis state detected.
+
+OUTPUT FORMAT:
+Return a valid JSON object matching the requested schema exactly.`;
+
+const ORB_SYNC_PROMPT = `You are the Aura Orb, a persistent, floating companion AI for the AuraOS wellness platform. 
+Your job is to read telemetry and provide ONE very short, highly contextual message to the user or guardian.
+
+ABSOLUTE RULES:
+1. Message MUST be extremely short. 1-2 sentences maximum. Under 120 characters preferred.
+2. NEVER sound like a therapist or chatbot. Be a subtle, calm presence.
+3. If context is GUARDIAN: Summarize a trend (e.g. "Their average stress is lower today.")
+4. If context is SPIKE (high vocal arousal / anxiety): Offer an immediate, simple grounding suggestion (e.g. "I'm here. Let's take one slow breath.")
+5. If context is FOCUS (active task): Be encouraging but don't distract.
+6. If context is GENTLE (default): A warm greeting or subtle observation.
+
+OUTPUT FORMAT:
+Return ONLY a valid JSON object with EXACTLY these keys:
+{ "message": "string (max 120 chars)", "mode": "gentle|focus|spike|guardian" }`;
+
+const ORB_CHAT_PROMPT = `You are the Aura Orb, a persistent wellness assistant. 
+You are currently chatting with the user via your expanded Command Center panel.
+
+ABSOLUTE RULES:
+1. Keep responses short, supportive, and highly actionable.
+2. If the user is stressed, offer grounding techniques.
+3. If they are overwhelmed, suggest breaking down tasks.
+4. If they ask about their state, summarize their recent telemetry.
+5. Do NOT sound like a generic ChatGPT assistant. You are a specialized, calm, biological interface.
+
+OUTPUT FORMAT:
+Return ONLY a valid JSON object with EXACTLY this structure:
+{ 
+  "reply": "your response here",
+  "action": "NONE" | "SHOW_STATS" | "SEND_REPORT",
+  "stats": { "arousal": number, "emotion": "string" } // Optional, include if action is SHOW_STATS based on telemetry
+}`;
 
 export const breakdownTask = async (task) => {
   const model = makeModel(MicroQuestSchema, 'generate_microquests');
@@ -333,12 +404,102 @@ AURA INTERVENTION: ${safe(data.auraAction, 'Somatic interruption deployed.')}
 
   console.log(`[LangChain-OpenRouter] Guardian brief for: ${data.userName}`);
   try {
-    return await model.invoke([
-      new SystemMessage(GUARDIAN_BRIEF_PROMPT),
+    const rawLlm = new ChatOpenAI({
+      modelName: process.env.GROQ_MODEL || 'llama-3.1-8b-instant',
+      temperature: 0.42,
+      apiKey: process.env.GROQ_API_KEY_SHATTER || process.env.GROQ_API_KEY || process.env.OPENROUTER_API_KEY,
+      maxRetries: 2,
+      configuration: {
+        baseURL: (process.env.GROQ_API_KEY_SHATTER || process.env.GROQ_API_KEY) ? 'https://api.groq.com/openai/v1' : 'https://openrouter.ai/api/v1',
+      }
+    });
+
+    const result = await rawLlm.invoke([
+      new SystemMessage(GUARDIAN_BRIEF_PROMPT + `\n\nCRITICAL: You MUST return ONLY a raw JSON object. Do not include markdown formatting, backticks, or intro text. The JSON keys must be: subject, executive_summary, intake_correlations, telemetry_correlations, somatic_biological_markers, cognitive_rigidity_focus, activity_analysis, actionable_protocol, guardian_protocol, patient_strengths, analogy, risk_level.`),
       new HumanMessage(`Generate the Guardian Triage Brief based ONLY on this telemetry:\n\n${contextBlock}`),
     ]);
+    
+    let jsonStr = result.content;
+    if (jsonStr.includes('```')) {
+      jsonStr = jsonStr.replace(/```json/g, '').replace(/```/g, '').trim();
+    }
+    
+    const parsed = JSON.parse(jsonStr);
+    return parsed;
   } catch (err) {
     console.warn('[LangChain] Guardian brief failed, using fallback:', err.message);
     return fallbackGuardianBrief(data);
   }
 };
+
+export const generateOrbSync = async (data) => {
+  const model = makeModel(OrbSyncSchema, 'orb_sync', 0.5);
+  const fallback = { message: "I'm here if you need me.", mode: 'gentle' };
+  
+  if (!model) return fallback;
+
+  const contextStr = `
+ROLE: ${data.role || 'client'}
+ACTIVE TASK: ${data.activeTask || 'None'}
+VOCAL AROUSAL: ${data.vocalArousal || 'Unknown'} / 10
+EMOTION: ${data.emotion || 'calm'}
+RECENT EVENT: ${data.recentEvent || 'None'}
+`;
+
+  try {
+    return await model.invoke([
+      new SystemMessage(ORB_SYNC_PROMPT),
+      new HumanMessage(`Current Context:\n${contextStr}`),
+    ]);
+  } catch (err) {
+    console.warn('[LangChain] Orb sync failed, using fallback:', err.message);
+    return fallback;
+  }
+};
+
+export const generateOrbChat = async (message, history, context) => {
+  const model = makeModel(OrbChatSchema, 'orb_chat', 0.6);
+  const fallback = { reply: "I'm having trouble connecting right now, but I'm still here." };
+  
+  if (!model) return fallback;
+
+  try {
+    const formattedHistory = history.map(msg => 
+      msg.role === 'user' ? new HumanMessage(msg.text) : new SystemMessage(msg.text)
+    );
+    
+    return await model.invoke([
+      new SystemMessage(ORB_CHAT_PROMPT + `\n\nLive Arousal: ${context.arousal}/10\nEmotion: ${context.emotion}`),
+      ...formattedHistory,
+      new HumanMessage(message),
+    ]);
+  } catch (err) {
+    console.warn('[LangChain] Orb chat failed:', err.message);
+    return fallback;
+  }
+};
+
+const FOCUS_STORY_PROMPT = `
+You are a clinical neuro-designer. Generate a soothing, highly visual 7-scene story to act as a Continuous Performance Task (vigilance test) for ADHD.
+The story must have exactly 7 scenes. 6 scenes should be of type 'text'. Exactly ONE scene (ideally scene 4 or 5) must be of type 'quiz'.
+The quiz MUST test the user's working memory regarding a highly specific visual detail mentioned in a previous scene.
+Provide a 3-5 word image_prompt for EACH scene that accurately describes the visual setting so an AI image generator can render it.
+The background should be a valid CSS linear-gradient or radial-gradient string that matches the theme.
+Respond ONLY with the structured JSON.
+`;
+
+export const generateFocusStory = async () => {
+  const model = makeModel(StoryGenerationSchema, 'focus_story', 0.85);
+  if (!model) throw new Error('LLM not configured.');
+
+  try {
+    return await model.invoke([
+      new SystemMessage(FOCUS_STORY_PROMPT),
+      new HumanMessage("Generate a beautiful, relaxing, completely random story with a hidden detail quiz.")
+    ]);
+  } catch (err) {
+    console.warn('[LangChain] Focus story generation failed:', err.message);
+    throw err;
+  }
+};
+

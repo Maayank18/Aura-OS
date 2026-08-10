@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BarChart2, Bell, FileText, Settings, LogOut, Users, Link as LinkIcon, ChevronDown } from 'lucide-react';
 import { authApi, getStoredAccount } from '../services/authApi.js';
+import OrbCompanion from '../components/OrbCompanion/OrbCompanion.jsx';
 
 const NAV = [
   { to: '/guardian/dashboard', label: 'Dashboard', icon: BarChart2 },
@@ -35,6 +36,7 @@ export default function GuardianLayout() {
 
   return (
     <div style={{ minHeight: '100dvh', background: 'var(--bg-root)', display: 'flex', flexDirection: 'column' }}>
+      <OrbCompanion role="guardian" />
       {/* ── Guardian Nav ── */}
       <nav className="guardian-nav">
         {/* Logo + role */}

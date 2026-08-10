@@ -1,6 +1,6 @@
 // AuraVoice.jsx — Living circuit-board orb, always in motion
 
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mic, MicOff, Wind, Activity, Zap, Volume2, VolumeX } from 'lucide-react';
 import useStore from '../../store/useStore.js';
@@ -68,7 +68,7 @@ const PULSE_B = [1,4,9,15,18,23,28,31,38];
 const PULSE_C = [2,5,6,16,19,24,25,32,35];
 const PULSE_DELAYS = [0,0.4,0.8,1.2,1.6,2.0,0.3,0.9,1.5,0.6,1.8,2.4,0.2,1.1,2.1,0.7,2.3,0.1,1.9,2.7,0.5,1.4,2.2,0.8];
 
-export default function AuraVoice() {
+export default function AuraVoice({ compact = false }) {
   const canvasRef = useRef(null);
   const [error, setError] = useState(null);
   const {
@@ -79,8 +79,57 @@ export default function AuraVoice() {
     audioMuted,
     isAuraSpeaking,
     setAudioMuted,
+    setAuraSpeaking,
   } = useStore();
   const { start, stop } = useAudioStream();
+
+  useEffect(() => {
+    if (auraResponse && !audioMuted && typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.cancel(); // Stop any ongoing speech
+      window.speechSynthesis.resume(); // Fix for Chrome speech synthesis getting permanently stuck
+      
+      const utterance = new SpeechSynthesisUtterance(auraResponse);
+      utterance.onstart = () => setAuraSpeaking(true);
+      utterance.onend = () => setAuraSpeaking(false);
+      utterance.onerror = (e) => {
+        console.warn('Speech synthesis error:', e);
+        setAuraSpeaking(false);
+      };
+      
+      // Try to find a high-quality female voice, explicitly avoiding known robotic male voices
+      const voices = window.speechSynthesis.getVoices();
+      const lowerMale = ['david', 'mark', 'paul', 'ravi', 'brian', 'daniel'];
+      
+      const preferredVoice = voices.find(v => {
+        const name = v.name.toLowerCase();
+        if (lowerMale.some(m => name.includes(m))) return false;
+        return name.includes('google uk english female') ||
+               name.includes('samantha') ||
+               name.includes('victoria') ||
+               name.includes('hazel') ||
+               name.includes('catherine') ||
+               name.includes('zira') ||
+               name.includes('kyoko') ||
+               name.includes('female');
+      }) || voices.find(v => v.name.toLowerCase().includes('female')) || voices[0];
+      
+      if (preferredVoice) utterance.voice = preferredVoice;
+
+      // Dynamic Acoustic Mirroring based on Aura's detected emotional state
+      if (auraEmotion === 'high_anxiety') {
+        utterance.rate = 0.85; // Speak slower to calm them down
+        utterance.pitch = 0.85; // Lower pitch is profoundly more soothing
+      } else if (auraEmotion === 'mild_anxiety') {
+        utterance.rate = 0.95;
+        utterance.pitch = 0.95;
+      } else {
+        utterance.rate = 1.0;
+        utterance.pitch = 1.1; // Slightly brighter/higher pitch when calm
+      }
+      
+      window.speechSynthesis.speak(utterance);
+    }
+  }, [auraResponse, audioMuted, setAuraSpeaking, auraEmotion]);
 
   const em = EMOTIONS[auraEmotion] || EMOTIONS.calm;
   const { color: C, glow: G } = em;
@@ -112,54 +161,56 @@ export default function AuraVoice() {
   const pulseMult   = isListening ? 0.5 : 1;
 
   return (
-    <div className="page fade-up w-full max-w-5xl mx-auto px-6 py-8">
+    <div className={compact ? "w-full h-full flex flex-col items-center justify-center relative overflow-hidden" : "page fade-up w-full max-w-5xl mx-auto px-6 py-8"}>
 
       {/* Header */}
-      <div style={{textAlign:'center',marginBottom:40}}>
-        <AnimatePresence mode="wait">
-          {isListening
-            ? <motion.span key="em" initial={{opacity:0,y:-6}} animate={{opacity:1,y:0}} exit={{opacity:0}}
-                className={`badge ${em.badge}`} style={{marginBottom:14,display:'inline-flex'}}>
-                <span style={{width:6,height:6,borderRadius:'50%',background:C,display:'inline-block',boxShadow:`0 0 6px ${C}`}}/>
-                {em.label} detected
-              </motion.span>
-            : <motion.span key="idle" initial={{opacity:0}} animate={{opacity:1}}
-                className="badge badge-cyan" style={{marginBottom:14}}>
-                <span style={{width:6,height:6,borderRadius:'50%',background:'#00e5ff',display:'inline-block'}}/>
-                Voice AI
-              </motion.span>
-          }
-        </AnimatePresence>
-        <h1 className="section-title">Talk to Aura</h1>
-        <p className="section-sub" style={{margin:'0 auto',textAlign:'center'}}>
-          Aura reads the sound of your voice — not just your words.<br/>
-          It meets you exactly where you are.
-        </p>
-        <div style={{marginTop:14,display:'flex',justifyContent:'center'}}>
-          <button
-            onClick={() => setAudioMuted(!audioMuted)}
-            style={{
-              display:'inline-flex',
-              alignItems:'center',
-              gap:8,
-              border:'1px solid rgba(0,229,255,0.28)',
-              background: audioMuted ? 'rgba(255,107,138,0.12)' : 'rgba(0,229,255,0.08)',
-              color: audioMuted ? '#ffb3c1' : '#80deea',
-              borderRadius:999,
-              padding:'9px 14px',
-              fontSize:12,
-              fontWeight:700,
-              letterSpacing:'0.03em',
-              cursor:'pointer',
-            }}
-          >
-            {audioMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
-            {audioMuted ? 'Voice muted' : 'Voice enabled'}
-          </button>
+      {!compact && (
+        <div style={{textAlign:'center',marginBottom:40}}>
+          <AnimatePresence mode="wait">
+            {isListening
+              ? <motion.span key="em" initial={{opacity:0,y:-6}} animate={{opacity:1,y:0}} exit={{opacity:0}}
+                  className={`badge ${em.badge}`} style={{marginBottom:14,display:'inline-flex'}}>
+                  <span style={{width:6,height:6,borderRadius:'50%',background:C,display:'inline-block',boxShadow:`0 0 6px ${C}`}}/>
+                  {em.label} detected
+                </motion.span>
+              : <motion.span key="idle" initial={{opacity:0}} animate={{opacity:1}}
+                  className="badge badge-cyan" style={{marginBottom:14}}>
+                  <span style={{width:6,height:6,borderRadius:'50%',background:'#00e5ff',display:'inline-block'}}/>
+                  Voice AI
+                </motion.span>
+            }
+          </AnimatePresence>
+          <h1 className="section-title">Talk to Aura</h1>
+          <p className="section-sub" style={{margin:'0 auto',textAlign:'center'}}>
+            Aura reads the sound of your voice — not just your words.<br/>
+            It meets you exactly where you are.
+          </p>
+          <div style={{marginTop:14,display:'flex',justifyContent:'center'}}>
+            <button
+              onClick={() => setAudioMuted(!audioMuted)}
+              style={{
+                display:'inline-flex',
+                alignItems:'center',
+                gap:8,
+                border:'1px solid rgba(0,229,255,0.28)',
+                background: audioMuted ? 'rgba(255,107,138,0.12)' : 'rgba(0,229,255,0.08)',
+                color: audioMuted ? '#ffb3c1' : '#80deea',
+                borderRadius:999,
+                padding:'9px 14px',
+                fontSize:12,
+                fontWeight:700,
+                letterSpacing:'0.03em',
+                cursor:'pointer',
+              }}
+            >
+              {audioMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+              {audioMuted ? 'Voice muted' : 'Voice enabled'}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
-      <div className="flex flex-col md:flex-row gap-12 items-start justify-center w-full">
+      <div className={`flex flex-col md:flex-row gap-12 items-center justify-center w-full ${compact ? 'mt-0' : ''}`}>
         {/* Left Column: Orb */}
         <div className="flex-1 flex flex-col items-center w-full max-w-sm mx-auto">
           {/* ═══════════════ LIVING CIRCUIT ORB ═══════════════ */}
@@ -168,8 +219,8 @@ export default function AuraVoice() {
             transition={{ repeat: Infinity, duration: 8, ease: 'easeInOut' }}
             style={{
             position:'relative',
-            width:'min(360px,88vw)', height:'min(360px,88vw)',
-            flexShrink:0, marginBottom:36,
+            width: compact ? 240 : 'min(360px,88vw)', height: compact ? 240 : 'min(360px,88vw)',
+            flexShrink:0, marginBottom: compact ? 0 : 36,
             borderRadius:'50%', overflow:'hidden',
             background:'radial-gradient(circle at 45% 42%, rgba(0,40,70,0.6) 0%, rgba(0,20,40,0.3) 40%, transparent 75%)',
             boxShadow: `0 20px 50px rgba(0,0,0,0.5), inset -20px -30px 60px rgba(0,0,0,0.7), inset 0 0 60px ${G.replace(/[\d.]+\)$/,'0.2)')}, inset 10px 15px 30px rgba(255,255,255,0.07)`,
@@ -337,44 +388,84 @@ export default function AuraVoice() {
               </motion.div>
             )}
           </AnimatePresence>
+
+          {compact && (
+            <div className="w-full mt-4 flex flex-col items-center gap-4">
+              <button
+                onClick={() => setAudioMuted(!audioMuted)}
+                style={{
+                  display:'inline-flex', alignItems:'center', gap:8,
+                  border:'1px solid rgba(0,229,255,0.28)',
+                  background: audioMuted ? 'rgba(255,107,138,0.12)' : 'rgba(0,229,255,0.08)',
+                  color: audioMuted ? '#ffb3c1' : '#80deea',
+                  borderRadius:999, padding:'8px 12px', fontSize:11, fontWeight:700,
+                  letterSpacing:'0.03em', cursor:'pointer',
+                }}
+              >
+                {audioMuted ? <VolumeX size={12} /> : <Volume2 size={12} />}
+                {audioMuted ? 'Muted' : 'Enabled'}
+              </button>
+
+              {/* Compact Transcript & Response */}
+              <div className="w-full flex flex-col gap-2 mt-2 px-4 max-w-[280px]">
+                <div className="glass w-full p-3 rounded-xl border border-white/5 flex flex-col gap-1" style={{ minHeight: '60px' }}>
+                  <p className="text-[9px] text-zinc-500 uppercase tracking-widest font-bold flex items-center gap-1">
+                    <Mic size={10} /> You said
+                  </p>
+                  <p className="text-[12px] text-zinc-300 leading-tight">
+                    {auraTranscript || (isListening ? 'Listening...' : 'Awaiting your voice...')}
+                  </p>
+                </div>
+                <div className="glass w-full p-3 rounded-xl border border-cyan-500/30 flex flex-col gap-1" style={{ background: 'rgba(0, 229, 255, 0.03)', minHeight: '60px' }}>
+                  <p className="text-[9px] text-cyan-400 uppercase tracking-widest font-bold flex items-center gap-1">
+                    <Wind size={10} /> Aura AI
+                  </p>
+                  <p className="text-[12px] text-zinc-100 leading-tight">
+                    {auraResponse || 'Aura will process and respond here...'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right Column: Chat Dashboard */}
-        <div className="flex-1 flex flex-col gap-6 w-full max-w-lg mx-auto h-full justify-center mt-8 md:mt-0">
-          
-          {/* Grounding tip */}
-          <AnimatePresence>
-            {isListening && auraEmotion !== 'calm' && (
-              <motion.div initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-8}}
-                className="glass"
-                style={{width:'100%',padding:'18px 22px'}}>
-                <p style={{fontSize:10.5,color:'var(--text-3)',marginBottom:6,textTransform:'uppercase',letterSpacing:'0.1em',fontWeight:700}}>Grounding tip</p>
-                <p style={{fontSize:15,color:'var(--text-1)',lineHeight:1.68}}>{em.tip}</p>
-              </motion.div>
-            )}
-          </AnimatePresence>
+        {!compact && (
+          <div className="flex-1 flex flex-col gap-6 w-full max-w-lg mx-auto h-full justify-center mt-8 md:mt-0">
+            
+            {/* Grounding tip */}
+            <AnimatePresence>
+              {isListening && auraEmotion !== 'calm' && (
+                <motion.div initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-8}}
+                  className="glass"
+                  style={{width:'100%',padding:'18px 22px'}}>
+                  <p style={{fontSize:10.5,color:'var(--text-3)',marginBottom:6,textTransform:'uppercase',letterSpacing:'0.1em',fontWeight:700}}>Grounding tip</p>
+                  <p style={{fontSize:15,color:'var(--text-1)',lineHeight:1.68}}>{em.tip}</p>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-          {/* Transcript (User Speech Box) */}
-          <div className="glass w-full p-6 flex flex-col h-48 overflow-y-auto border border-white/5 relative">
-            <p className="text-[10.5px] text-zinc-500 mb-3 uppercase tracking-widest font-bold flex items-center gap-2">
-              <Mic size={12} /> You said
-            </p>
-            <p className="text-[15px] text-zinc-300 leading-relaxed whitespace-pre-wrap">
-              {auraTranscript || (isListening ? 'Listening...' : 'Awaiting your voice...')}
-            </p>
+            {/* Transcript (User Speech Box) */}
+            <div className="glass w-full p-6 flex flex-col h-48 overflow-y-auto border border-white/5 relative">
+              <p className="text-[10.5px] text-zinc-500 mb-3 uppercase tracking-widest font-bold flex items-center gap-2">
+                <Mic size={12} /> You said
+              </p>
+              <p className="text-[15px] text-zinc-300 leading-relaxed whitespace-pre-wrap">
+                {auraTranscript || (isListening ? 'Listening...' : 'Awaiting your voice...')}
+              </p>
+            </div>
+
+            {/* Aura response Box */}
+            <div className="glass w-full p-6 flex flex-col min-h-[12rem] border border-cyan-500/30 relative" style={{ background: 'rgba(0, 229, 255, 0.03)' }}>
+              <p className="text-[10.5px] text-cyan-400 mb-3 uppercase tracking-widest font-bold flex items-center gap-2">
+                <Wind size={12} /> Aura AI
+              </p>
+              <p className="text-[16px] text-zinc-100 leading-relaxed whitespace-pre-wrap">
+                {auraResponse || 'Aura will process and respond here when you stop speaking.'}
+              </p>
+            </div>
           </div>
-
-          {/* Aura response Box */}
-          <div className="glass w-full p-6 flex flex-col min-h-[12rem] border border-cyan-500/30 relative" style={{ background: 'rgba(0, 229, 255, 0.03)' }}>
-            <p className="text-[10.5px] text-cyan-400 mb-3 uppercase tracking-widest font-bold flex items-center gap-2">
-              <Wind size={12} /> Aura AI
-            </p>
-            <p className="text-[16px] text-zinc-100 leading-relaxed whitespace-pre-wrap">
-              {auraResponse || 'Aura will process and respond here when you stop speaking.'}
-            </p>
-          </div>
-
-        </div>
+        )}
       </div>
     </div>
   );

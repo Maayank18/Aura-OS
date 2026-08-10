@@ -4,8 +4,8 @@
   "description": "AuraOS monorepo root",
   "private": true,
   "scripts": {
-    "install:all": "npm i --prefix backend-node && npm i --prefix frontend",
-    "dev": "npx concurrently --names \"NODE,VITE\" --prefix-colors \"magenta,cyan\" \"npm run dev --prefix backend-node\" \"npm run dev --prefix frontend\"",
+    "install:all": "npm i --prefix backend-node && npm i --prefix frontend && npm i --prefix aura-desktop",
+    "dev": "npx concurrently --names \"NODE,VITE,ORB\" --prefix-colors \"magenta,cyan,blue\" \"npm run dev --prefix backend-node\" \"npm run dev --prefix frontend\" \"npm start --prefix aura-desktop\"",
     "dev:node": "npm run dev --prefix backend-node",
     "dev:frontend": "npm run dev --prefix frontend"
   },

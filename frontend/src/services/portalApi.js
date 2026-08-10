@@ -86,9 +86,12 @@ export const clinicalApi = {
   // 14-day therapy brief
   therapyBrief:    (userId)   => req('POST', '/therapy-brief', { userId }, AI_TIMEOUT),
 
-  // Memory-safe blob download
   downloadReportPdfBuffer: async (reportId, filename = 'AuraOS-Report.pdf') => {
-    const res = await fetch(`${BASE}/session-report/${reportId}/pdf`);
+    const res = await fetch(`${BASE}/session-report/${reportId}/pdf`, {
+      headers: {
+        ...(getAuthToken() ? { Authorization: `Bearer ${getAuthToken()}` } : {}),
+      },
+    });
     if (!res.ok) throw new Error(`Download failed (${res.status})`);
     const blob = await res.blob();
     const url = window.URL.createObjectURL(blob);

@@ -193,36 +193,52 @@ UserStateSchema.methods.ensureClinicalTelemetry = function () {
   }
 };
 
-// 🌟 NEW: Convenience helper — push a vocal stress event
-UserStateSchema.methods.logVocalStress = async function ({ emotion, arousalScore, taskContext, transcriptChunk, wpm, detectedDistortions }) {
-  this.ensureClinicalTelemetry();
-  this.clinicalTelemetry.vocalStressEvents.push({ 
-    emotion, 
-    arousalScore, 
-    taskContext,
-    transcriptChunk,
-    wpm,
-    detectedDistortions
-  });
-  // Keep rolling 90-day window
-  const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
-  this.clinicalTelemetry.vocalStressEvents =
-    this.clinicalTelemetry.vocalStressEvents.filter(e => e.timestamp > cutoff);
-  return this.save();
+// 🌟 NEW: Convenience helper — push a vocal stress event (O(1) Atomic)
+UserStateSchema.methods.logVocalStress = async function (payload) {
+  return this.model('UserState').updateOne(
+    { _id: this._id },
+    {
+      $push: {
+        'clinicalTelemetry.vocalStressEvents': {
+          $each: [payload],
+          $slice: -1000
+        }
+      },
+      $set: { lastActive: new Date() }
+    }
+  );
 };
 
-// 🌟 NEW: Push a forge session event
-UserStateSchema.methods.logForgeSession = async function ({ wordCount, worryDensity, worryCount }) {
-  this.ensureClinicalTelemetry();
-  this.clinicalTelemetry.forgeSessions.push({ wordCount, worryDensity, worryCount });
-  return this.save();
+// 🌟 NEW: Push a forge session event (O(1) Atomic)
+UserStateSchema.methods.logForgeSession = async function (payload) {
+  return this.model('UserState').updateOne(
+    { _id: this._id },
+    {
+      $push: {
+        'clinicalTelemetry.forgeSessions': {
+          $each: [payload],
+          $slice: -1000
+        }
+      },
+      $set: { lastActive: new Date() }
+    }
+  );
 };
 
-// 🌟 NEW: Push an executive function event
-UserStateSchema.methods.logExecFunction = async function ({ taskId, taskSummary, status, blocker }) {
-  this.ensureClinicalTelemetry();
-  this.clinicalTelemetry.executiveFunction.push({ taskId, taskSummary, status, blocker });
-  return this.save();
+// 🌟 NEW: Push an executive function event (O(1) Atomic)
+UserStateSchema.methods.logExecFunction = async function (payload) {
+  return this.model('UserState').updateOne(
+    { _id: this._id },
+    {
+      $push: {
+        'clinicalTelemetry.executiveFunction': {
+          $each: [payload],
+          $slice: -1000
+        }
+      },
+      $set: { lastActive: new Date() }
+    }
+  );
 };
 
 const UserState = mongoose.model('UserState', UserStateSchema);

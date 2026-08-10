@@ -15,15 +15,25 @@ import { getAuthToken } from './authApi.js';
 const req = async (method, path, body, timeoutMs = API_TIMEOUT) => {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
-  const token = getAuthToken();
+  
+  const getHeaders = () => {
+    const token = getAuthToken();
+    const isDesktop = typeof window !== 'undefined' && !!window.electronAPI;
+    
+    const headers = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    if (isDesktop) headers['x-desktop-mode'] = 'true';
+    
+    return headers;
+  };
 
   try {
     const res = await fetch(`${BASE}${path}`, {
       method,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {})
-      },
+      headers: getHeaders(),
       signal: controller.signal,
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
@@ -100,6 +110,29 @@ export const shatterApi = {
 
 // ── Clinical API ──────────────────────────────────────────────────────────────
 export const clinicalApi = {
+  generateStory: () => get('/clinical/generate-story'),
   generateRecoveryProtocol: (userId, reportData) => postAI('/clinical/recovery-protocol', { userId, reportData }),
   voiceTriage: (userId, transcriptChunk, wpm, averageVolume) => postAI('/clinical/voice-triage', { userId, transcriptChunk, wpm, averageVolume }),
+  orbSync: (telemetry) => postAI('/clinical/orb-sync', telemetry),
+  orbChat: (payload) => postAI('/clinical/orb-chat', payload),
+  transcribeAudio: async (audioBlob) => {
+    const formData = new FormData();
+    formData.append('audio', audioBlob, 'audio.webm');
+    
+    const token = getAuthToken();
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    if (typeof window !== 'undefined' && !!window.electronAPI) headers['x-desktop-mode'] = 'true';
+
+    const res = await fetch('/api/clinical/transcribe', {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Transcription failed');
+    }
+    return res.json();
+  }
 };

@@ -19,7 +19,7 @@ import { v4 as uuidv4 } from 'uuid';
 import confetti from 'canvas-confetti';
 import Matter from 'matter-js';
 import useStore from '../../store/useStore.js';
-import { forgeApi } from '../../services/api.js';
+import { forgeApi, clinicalApi } from '../../services/api.js';
 import PerceptionProbe from '../PerceptionProbe.jsx';
 import usePhysics from '../../hooks/usePhysics.js';
 import CalmButton from '../CalmButton/CalmButton.jsx';
@@ -85,14 +85,32 @@ const derivePredictedEffects = (gameId, metrics) => {
     }
     case 'color_sort': {
       const mistakes = extraData.mistakes || 0;
+      const { maxPauseMs = 0, rapidMoves = 0 } = metrics;
       eff.stressReduction    = 4;
       eff.dopamineActivation = Math.min(10, Math.round(accuracy * 0.08 + 2));
       eff.focusScore         = Math.min(10, Math.round(accuracy * 0.09 + 1));
-      eff.arousalLevel       = mistakes > 8 ? 'high' : mistakes > 3 ? 'moderate' : 'low';
-      eff.clinicalNote = `Color Sort: ${interactions} balls sorted, ${mistakes} errors (${accuracy}% accuracy). `
-        + (mistakes > 8 ? 'High error rate indicates impulsive sorting; possible executive dysfunction.'
-          : mistakes < 3 ? 'High spatial accuracy; strong cognitive flexibility and working memory.'
-          : 'Moderate performance; some cognitive fatigue or distractibility present.');
+      eff.arousalLevel       = mistakes > 8 || rapidMoves > 5 ? 'high' : mistakes > 3 ? 'moderate' : 'low';
+      
+      let note = `Color Sort: ${interactions} balls sorted, ${mistakes} errors (${accuracy}% accuracy). `;
+      if (rapidMoves > 3) note += `High impulsivity detected (${rapidMoves} rapid moves under 600ms). `;
+      if (maxPauseMs > 3000) note += `Significant hesitation (${Math.round(maxPauseMs/1000)}s pause) indicates cognitive freezing or overload. `;
+      else if (mistakes > 8) note += 'High error rate indicates impulsive sorting; possible executive dysfunction. ';
+      else if (mistakes < 3 && avgReactionMs < 1200) note += 'High spatial accuracy and rapid processing; strong cognitive flexibility and working memory. ';
+      else note += 'Moderate performance; some cognitive fatigue or distractibility present.';
+      
+      eff.clinicalNote = note.trim();
+      break;
+    }
+    case 'focus_story': {
+      eff.stressReduction    = 6;
+      eff.dopamineActivation = Math.min(10, Math.round(accuracy * 0.08 + 2));
+      eff.focusScore         = Math.min(10, Math.round(accuracy * 0.1));
+      eff.arousalLevel       = accuracy < 50 ? 'high' : 'low';
+      let note = `Continuous Performance Task (Story Mode): ${accuracy}% accuracy, ${avgReactionMs}ms reaction time. `;
+      if (accuracy === 100 && avgReactionMs < 2000) note += 'Strong sustained attention and vigilance. No signs of ADHD cognitive drift.';
+      else if (accuracy === 100) note += 'Sustained attention is intact, but processing speed is slightly delayed.';
+      else note += 'Failed vigilance check. High indication of working memory deficit and inattentive-type ADHD drift.';
+      eff.clinicalNote = note.trim();
       break;
     }
     case 'word_smash': {
@@ -614,6 +632,10 @@ function ColorSort({ onSessionEnd }) {
   const containerRef = useRef(null);
   const tubeRefs     = useRef([null,null,null,null]);
   const startRef     = useRef(Date.now());
+  const lastInteractionRef = useRef(Date.now());
+  const maxPauseRef  = useRef(0);
+  const rapidMovesRef= useRef(0);
+  const rxTimesRef   = useRef([]);
   const currentBall  = queue[0] || null;
 
   const getEventPos = (e) => {
@@ -647,6 +669,13 @@ function ColorSort({ onSessionEnd }) {
     });
     setDragging(false);
     if (droppedTube !== null) {
+      const now = Date.now();
+      const rxTime = now - lastInteractionRef.current;
+      rxTimesRef.current.push(rxTime);
+      if (rxTime > maxPauseRef.current) maxPauseRef.current = rxTime;
+      if (rxTime < 600) rapidMovesRef.current += 1;
+      lastInteractionRef.current = now;
+
       if (SORT_COLORS[droppedTube].id === currentBall.id) {
         playSort(droppedTube);
         setCorrect(c => c + 1);
@@ -669,7 +698,13 @@ function ColorSort({ onSessionEnd }) {
   const accuracy = correct+mistakes > 0 ? Math.round(correct/(correct+mistakes)*100) : 100;
   const handleEnd = () => {
     const dur = Math.round((Date.now()-startRef.current)/1000);
-    onSessionEnd({ gameId:'color_sort', gameName:'Color Sort', durationSeconds:dur, interactions:correct+mistakes, avgReactionMs:800, accuracy, score:correct, extraData:{ mistakes } });
+    const avgRx = rxTimesRef.current.length ? Math.round(rxTimesRef.current.reduce((a,b)=>a+b,0)/rxTimesRef.current.length) : 800;
+    onSessionEnd({ 
+      gameId:'color_sort', gameName:'Color Sort', durationSeconds:dur, 
+      interactions:correct+mistakes, avgReactionMs:avgRx, 
+      maxPauseMs: maxPauseRef.current, rapidMoves: rapidMovesRef.current,
+      accuracy, score:correct, extraData:{ mistakes } 
+    });
   };
 
   const containerRect = containerRef.current?.getBoundingClientRect();
@@ -1457,6 +1492,177 @@ function BreatheFlow({ onSessionEnd }) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
+// FOCUS STORY MODE (Continuous Performance Task)
+// ════════════════════════════════════════════════════════════════════════════════
+const FALLBACK_STORY = {
+  id: 'ocean_dive', title: 'The Deep Ocean Dive',
+  background: 'linear-gradient(to bottom, #020c14, #001f3f)',
+  scenes: [
+    { text: "You begin your descent into the midnight zone...", duration: 4000, type: 'text' },
+    { text: "The water around you turns a deeper shade of indigo.", duration: 4000, type: 'text' },
+    { text: "A rare, glowing green jellyfish drifts past your window.", duration: 5000, type: 'text' },
+    { text: "The pressure gauge clicks softly as you go deeper.", duration: 4000, type: 'text' },
+    { type: 'quiz', question: "What color was the rare jellyfish we just passed?", options: ['Blue', 'Green', 'Purple', 'Red'], answer: 'Green' },
+    { text: "You stabilize the submarine. The mission continues.", duration: 4000, type: 'text' },
+    { text: "Strange bioluminescent lights flicker in the distance.", duration: 4000, type: 'text' },
+    { text: "You have safely reached the ocean floor. Mission accomplished.", duration: 5000, type: 'text' }
+  ]
+};
+
+function FocusStoryMode({ onSessionEnd }) {
+  const [story, setStory] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [sceneIndex, setSceneIndex] = useState(0);
+  const [quizActive, setQuizActive] = useState(false);
+  const [completed, setCompleted] = useState(false);
+  const [quizStart, setQuizStart] = useState(0);
+  const [reactionMs, setReactionMs] = useState(0);
+  const [correct, setCorrect] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const startRef = useRef(null);
+
+  useEffect(() => {
+    let mounted = true;
+    clinicalApi.generateStory().then(res => {
+      if (!mounted) return;
+      setStory(res.story);
+      setLoading(false);
+      startRef.current = Date.now();
+    }).catch(err => {
+      console.warn('Failed to fetch AI story, using fallback', err);
+      if (!mounted) return;
+      setStory(FALLBACK_STORY);
+      setLoading(false);
+      startRef.current = Date.now();
+    });
+    return () => { mounted = false; };
+  }, []);
+
+  // Reset imageLoaded flag when scene changes
+  useEffect(() => {
+    setImageLoaded(false);
+  }, [sceneIndex]);
+
+  useEffect(() => {
+    if (loading || completed || quizActive || !story) return;
+    const scene = story.scenes[sceneIndex];
+    if (!scene) { handleEnd(); return; }
+
+    if (scene.type === 'quiz') {
+      setQuizActive(true);
+      setQuizStart(Date.now());
+      return;
+    }
+
+    // Pause timer if we are waiting for an image to load
+    if (scene.image_prompt && !imageLoaded) return;
+
+    const timer = setTimeout(() => setSceneIndex(prev => prev + 1), scene.duration || 5000);
+    return () => clearTimeout(timer);
+  }, [sceneIndex, story, quizActive, completed, loading, imageLoaded]);
+
+  const handleQuizAnswer = (option) => {
+    const rx = Date.now() - quizStart;
+    setReactionMs(rx);
+    const scene = story.scenes[sceneIndex];
+    const isCorrect = option === scene.answer;
+    setCorrect(isCorrect);
+    setQuizActive(false);
+    setSceneIndex(prev => prev + 1);
+  };
+
+  const handleEnd = () => {
+    setCompleted(true);
+    const dur = Math.round((Date.now() - (startRef.current || Date.now())) / 1000);
+    onSessionEnd({
+      gameId: 'focus_story', gameName: 'Focus Story',
+      durationSeconds: dur, interactions: 1,
+      avgReactionMs: reactionMs || 3000,
+      accuracy: correct ? 100 : 0, score: correct ? 1 : 0,
+      extraData: { correct }
+    });
+  };
+
+  if (loading) {
+    return (
+      <GameShell title="Story Mode" color="#10b981" score={0} unit="acc%" onEnd={() => {}}>
+        <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', color: '#fff' }}>
+          <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 2, ease: "linear" }} style={{ width: 40, height: 40, border: '3px solid rgba(16,185,129,0.3)', borderTopColor: '#10b981', borderRadius: '50%', marginBottom: 20 }} />
+          <div style={{ fontSize: 14, color: 'var(--text-3)', letterSpacing: '0.05em' }}>Generating unique neural landscape...</div>
+        </div>
+      </GameShell>
+    );
+  }
+
+  const scene = story.scenes[sceneIndex];
+  const imageUrl = scene && scene.image_prompt && scene.type !== 'quiz'
+    ? `https://image.pollinations.ai/prompt/${encodeURIComponent(scene.image_prompt + ' cinematic highly detailed wallpaper')}?width=800&height=500&nologo=true&seed=${Math.floor(Math.random() * 9999999)}`
+    : null;
+
+  return (
+    <GameShell title={story.title} color="#10b981" score={correct?100:0} unit="acc%" onEnd={handleEnd}>
+      <div style={{
+        width: '100%', height: '100%',
+        background: story.background || '#020c14',
+        borderRadius: 14, display: 'flex', flexDirection: 'column',
+        justifyContent: 'center', alignItems: 'center', color: '#fff',
+        textAlign: 'center', padding: 20, position: 'relative', overflow: 'hidden',
+      }}>
+        
+        {/* Dynamic Image Background */}
+        <AnimatePresence>
+          {imageUrl && !quizActive && (
+            <motion.img 
+              key={imageUrl}
+              src={imageUrl}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: imageLoaded ? 1 : 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 1.5 }}
+              onLoad={() => setImageLoaded(true)}
+              onError={() => setImageLoaded(true)} // Fail gracefully, start timer anyway
+              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 1 }}
+            />
+          )}
+        </AnimatePresence>
+
+        {/* Loading Spinner for Image */}
+        {!imageLoaded && imageUrl && !quizActive && (
+          <div style={{ position: 'absolute', zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', opacity: 0.6 }}>
+            <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }} style={{ width: 24, height: 24, border: '2px solid rgba(255,255,255,0.2)', borderTopColor: '#fff', borderRadius: '50%', marginBottom: 10 }} />
+            <span style={{ fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Visualizing...</span>
+          </div>
+        )}
+
+        {/* Dark overlay for text readability (only show when image is loaded and not a quiz) */}
+        {imageLoaded && !quizActive && <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.85), rgba(0,0,0,0.4))', zIndex: 2 }} />}
+
+        <AnimatePresence mode="wait">
+          {quizActive && scene ? (
+            <motion.div key="quiz" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} style={{ background: 'rgba(0,0,0,0.9)', padding: 30, borderRadius: 16, border: '1px solid rgba(16,185,129,0.5)', backdropFilter: 'blur(15px)', zIndex: 10, width: '90%' }}>
+              <h3 style={{ fontSize: 20, marginBottom: 24, fontWeight: 700, color: '#10b981' }}>{scene.question}</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                {scene.options?.map(opt => (
+                  <button key={opt} onClick={() => handleQuizAnswer(opt)} style={{ padding: '14px 18px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, color: '#fff', cursor: 'pointer', fontSize: 15, fontWeight: 600, transition: 'all 0.2s' }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(16,185,129,0.2)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}>
+                    {opt}
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          ) : scene && !completed && (!scene.image_prompt || imageLoaded) ? (
+            <motion.div key={sceneIndex} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -15 }} transition={{ duration: 1.2 }} style={{ fontSize: 24, fontWeight: 600, lineHeight: 1.6, maxWidth: '85%', zIndex: 5, textShadow: '0 2px 10px rgba(0,0,0,0.9)' }}>
+              {scene.text}
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+      </div>
+    </GameShell>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
 // SESSION REPORT PANEL (in-app, no download required)
 // ════════════════════════════════════════════════════════════════════════════════
 function SessionReportPanel({ gameSessions, worries, destroyedCount, onDownloadReport, reportBusy }) {
@@ -1600,6 +1806,7 @@ const GAME_DEFS = [
   { id:'word_smash',      name:'Word Smash',      emoji:'💥', color:'#c4b5fd', tagline:'Crush negativity',       mechanic:'Click to smash', side:'left', explanation:'Aids in cognitive reframing and stress relief by actively destroying negative associations.', Component:WordSmash      },
   { id:'processing_grid', name:'Processing Grid', emoji:'🎯', color:'#a78bfa', tagline:'Schulte Table + Lines',  mechanic:'Connect 1-25',   side:'left', explanation:'Tests visual scanning speed and resilience to environmental distraction (brain fog).', Component:ProcessingGrid },
   { id:'memory_pulse',    name:'Memory Pulse',    emoji:'🧠', color:'#a78bfa', tagline:'Test working memory',    mechanic:'Sequence repeat',side:'right', explanation:'Quantifies working memory capacity and sequence retention capabilities.', Component:MemoryPulse    },
+  { id:'focus_story',     name:'Story Mode',      emoji:'📖', color:'#10b981', tagline:'Test sustained attention', mechanic:'CPT Vigilance', side:'right', explanation:'Clinical Continuous Performance Task (CPT) measuring sustained attention and vigilance.', Component:FocusStoryMode },
   { id:'perception_probe',name:'Perspective',     emoji:'👁️', color:'#5eead4', tagline:'Cognitive rigidity test', mechanic:'Illusion switch', side:'right', explanation:'Detects cognitive rigidity by measuring how quickly you switch visual perspectives.', Component:PerceptionProbe    },
   { id:'overcharge_protocol', name:'Overcharge Protocol', emoji:'⚡', color:'#ff2052', tagline:'Risk vs Reward (BART)', mechanic:'Hold to charge', side:'right', explanation:'Evaluates dopamine-seeking risk behavior versus anxiety-driven risk aversion.', Component:OverchargeProtocol },
 ];

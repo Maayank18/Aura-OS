@@ -1,15 +1,5 @@
 import { ChatOpenAI } from "@langchain/openai";
-import { z } from "zod";
 import UserState from "../models/UserState.js";
-
-// Define the structured output schema using Zod
-const triageSchema = z.object({
-  stressTier: z.enum(["BASELINE", "ELEVATED", "PANIC_FREEZE"]).describe("The determined stress tier based on speech patterns and semantics."),
-  detectedDistortions: z.array(z.string()).describe("A list of cognitive distortions detected in the transcript, such as absolutes or fragmented speech."),
-  groundingResponse: z.string().describe("A short, empathetic, 1-sentence response to instantly ground the user."),
-});
-
-let structuredLlm = null;
 
 const clampNumber = (value, fallback, min, max) => {
   const parsed = Number(value);
@@ -56,30 +46,32 @@ const localTriage = ({ transcriptChunk, wpm, averageVolume }) => {
     stressTier,
     detectedDistortions: distortions,
     groundingResponse,
+    emotion: 'calm'
   };
 };
 
-const getStructuredLlm = () => {
-  if (structuredLlm) return structuredLlm;
-
-  const apiKey = process.env.GROQ_API_KEY_AURAVOICE || process.env.GROQ_API_KEY;
+const getRawLlm = () => {
+  const openRouterKey = process.env.OPENROUTER_API_KEY;
+  const groqKey = process.env.GROQ_API_KEY_AURAVOICE || process.env.GROQ_API_KEY;
+  
+  const apiKey = openRouterKey || groqKey;
   if (!apiKey) return null;
+  
+  const useOpenRouter = !!openRouterKey;
 
-  const llm = new ChatOpenAI({
-    modelName: process.env.GROQ_MODEL || "llama-3.1-8b-instant",
-    temperature: 0.25,
+  return new ChatOpenAI({
+    modelName: useOpenRouter ? (process.env.OPENROUTER_MODEL || "openai/gpt-4o-mini") : (process.env.GROQ_MODEL || "llama-3.1-8b-instant"),
+    temperature: 0.85,
     maxTokens: 512,
     apiKey,
     configuration: {
-      baseURL: "https://api.groq.com/openai/v1",
+      baseURL: useOpenRouter ? "https://openrouter.ai/api/v1" : "https://api.groq.com/openai/v1",
+      defaultHeaders: useOpenRouter ? {
+        'HTTP-Referer': 'http://localhost:5173',
+        'X-Title': 'AuraOS Voice Triage',
+      } : undefined
     },
   });
-
-  structuredLlm = llm.withStructuredOutput(triageSchema, {
-    name: "CatastrophicLinguisticAnalysis",
-    method: "functionCalling",
-  });
-  return structuredLlm;
 };
 
 /**
@@ -100,52 +92,62 @@ export const voiceTriageHandler = async (req, res) => {
   }
 
   const fallback = localTriage({ transcriptChunk, wpm, averageVolume });
-  const model = getStructuredLlm();
+  const llm = getRawLlm();
 
-  if (!model) {
+  if (!llm) {
     return res.status(200).json({
       success: true,
       data: fallback,
-      meta: { source: "local_fallback", reason: "GROQ_API_KEY_AURAVOICE or GROQ_API_KEY is not configured" },
+      meta: { source: "local_fallback", reason: "API Key is not configured" },
     });
   }
 
-  // System instructions for the Catastrophic Linguistic Analyzer
+  // System instructions for the Deep Somatic Linguistic Analyzer
   const prompt = `
-    Analyze transcript. WPM: ${wpm}, Vol: ${averageVolume}.
-    Text: "${transcriptChunk}"
+    You are Aura, an empathetic, highly advanced emotional intelligence companion.
+    
+    ACOUSTIC TELEMETRY:
+    - Speech Speed: ${wpm} Words Per Minute (Average is 130-150. >160 is fast/anxious, <110 is slow/sad/exhausted).
+    - Volume Intensity: ${averageVolume}/100 (Average is 30-50. >60 is loud/intense, <20 is quiet/withdrawn).
+    
+    USER TRANSCRIPT:
+    "${transcriptChunk}"
 
-    1. WPM > 160 = racing thoughts.
-    2. Detect cognitive distortions (e.g. absolutes like "never").
-    3. Detect fragmented sentences = executive overwhelm.
-    4. Set stressTier: BASELINE, ELEVATED, or PANIC_FREEZE.
-    
-    Strict Persona & Response Rules:
-    - Write 1-2 short, conversational, empathetic sentences addressing content to help regulate (groundingResponse).
-    - You are not a generic AI. You are a deeply caring, protective therapist and a close personal guardian. Your responses must feel incredibly warm, loving, and human.
-    - Where appropriate, weave in natural terms of kinship and endearment (such as 'beta' or 'bhaiya', adjusting for a comforting, familial dynamic) to make the user feel unconditionally safe and heard.
-    
-    Strict Language Rule:
-    - You must only process and respond in English. Ignore any non-English inputs.
+    MISSION:
+    1. Analyze the exact text AND the acoustic telemetry. If they are speaking very fast and loud, they might be panicking or excited. If slow and quiet, they might be depressed or tired.
+    2. Respond with EXACTLY 1-3 sentences that are highly dynamic, conversational, and deeply personalized to exactly what they just said. Do NOT give generic or repetitive answers. Reflect their specific words, situation, or emotion back to them.
+    3. Be warm, soothing, and utterly human.
+    4. Determine the 'stressTier': BASELINE, ELEVATED, or PANIC_FREEZE based on their arousal.
+    5. Determine the exact 'emotion' mapping to one of: calm, mild_anxiety, high_anxiety.
+
+    CRITICAL INSTRUCTION:
+    You MUST return ONLY a raw JSON object with NO markdown blocks and NO backticks.
+    Expected keys:
+    - stressTier (String: BASELINE, ELEVATED, PANIC_FREEZE)
+    - emotion (String: calm, mild_anxiety, high_anxiety)
+    - detectedDistortions (Array of Strings: e.g. "absolutes", "exhaustion", "panic")
+    - groundingResponse (String: The deeply personal, highly dynamic conversational spoken response to the user)
   `;
 
   try {
-    const result = await model.invoke(prompt);
+    const result = await llm.invoke(prompt);
+    
+    let jsonStr = result.content;
+    if (jsonStr.includes('```')) {
+      jsonStr = jsonStr.replace(/```json/gi, '').replace(/```/g, '').trim();
+    }
+    const parsedData = JSON.parse(jsonStr);
 
     if (userId) {
       try {
         const user = await UserState.findOrCreate(userId);
-        let mappedEmotion = 'calm';
-        if (result.stressTier === 'ELEVATED') mappedEmotion = 'mild_anxiety';
-        else if (result.stressTier === 'PANIC_FREEZE') mappedEmotion = 'high_anxiety';
-        
         await user.logVocalStress({
-          emotion: mappedEmotion,
-          arousalScore: result.stressTier === 'PANIC_FREEZE' ? 9 : result.stressTier === 'ELEVATED' ? 6 : 2,
+          emotion: parsedData.emotion || 'calm',
+          arousalScore: parsedData.stressTier === 'PANIC_FREEZE' ? 9 : parsedData.stressTier === 'ELEVATED' ? 6 : 2,
           taskContext: "Aura Voice Conversation",
           transcriptChunk,
           wpm,
-          detectedDistortions: result.detectedDistortions || []
+          detectedDistortions: parsedData.detectedDistortions || []
         });
       } catch (err) {
         console.error("Failed to save voice telemetry to UserState:", err);
@@ -155,7 +157,7 @@ export const voiceTriageHandler = async (req, res) => {
     // Return the structured JSON directly to the frontend telemetry caller
     res.status(200).json({
       success: true,
-      data: result,
+      data: parsedData,
       meta: { source: "groq" },
     });
   } catch (error) {
@@ -165,5 +167,42 @@ export const voiceTriageHandler = async (req, res) => {
       data: fallback,
       meta: { source: "local_fallback", reason: "AI provider failed" },
     });
+  }
+};
+
+import OpenAI, { toFile } from "openai";
+
+/**
+ * Controller to handle native Desktop Audio Transcription using Groq Whisper.
+ */
+export const transcribeAudioHandler = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: "No audio file provided." });
+    }
+
+    const apiKey = process.env.GROQ_API_KEY_AURAVOICE || process.env.GROQ_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ success: false, error: "Groq API key not configured." });
+    }
+
+    const groq = new OpenAI({
+      apiKey,
+      baseURL: "https://api.groq.com/openai/v1",
+    });
+
+    const file = await toFile(req.file.buffer, "audio.webm", { type: req.file.mimetype });
+    
+    const transcription = await groq.audio.transcriptions.create({
+      file,
+      model: "whisper-large-v3-turbo",
+      response_format: "json",
+      language: "en",
+    });
+
+    return res.json({ success: true, text: transcription.text });
+  } catch (error) {
+    console.error("Audio transcription failed:", error);
+    return res.status(500).json({ success: false, error: "Failed to transcribe audio." });
   }
 };

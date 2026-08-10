@@ -33,10 +33,13 @@ const GameSessionSchema = new mongoose.Schema(
     durationSeconds:  { type:Number, min:0, default:0 },
     interactions:     { type:Number, min:0, default:0 },
     avgReactionMs:    { type:Number, min:0, default:0 },
+    maxPauseMs:       { type:Number, min:0, default:0 }, // 🆕 Behavioral Telemetry (Hesitation)
+    rapidMoves:       { type:Number, min:0, default:0 }, // 🆕 Behavioral Telemetry (Impulsivity)
     accuracy:         { type:Number, min:0, max:100, default:100 },
     score:            { type:Number, min:0, default:0 },
     completedAt:      { type:Date, default:Date.now },
     predictedEffects: { type:PredictedEffectsSchema, default:() => ({}) },
+    extraData:        { type:Object, default: {} } // 🆕 For extending dynamic metrics
   },
   { _id:false }
 );

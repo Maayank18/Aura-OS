@@ -18,11 +18,13 @@ export default function AuthPage() {
   const location = useLocation();
   const { isAuthenticated, role } = useAuth();
 
+  const [initialCheck, setInitialCheck] = useState(false);
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && !initialCheck) {
       navigate(role === 'guardian' || role === 'committee' ? '/guardian/dashboard' : '/app', { replace: true });
     }
-  }, [isAuthenticated, role, navigate]);
+    setInitialCheck(true);
+  }, [isAuthenticated, role, navigate, initialCheck]);
 
   const { authForm, setAuthFormEmployeeDetails } = useStore();
   const { currentMode, subRole, employeeDetails } = authForm;
@@ -78,8 +80,8 @@ export default function AuthPage() {
         if (isSecondary) {
             setSuccess('Setup complete. Please authenticate below to begin your session.');
             setActionType('login');
-            // Force logout from localStorage
-            localStorage.removeItem('aura-auth');
+            // Force logout securely to ensure statelessness
+            authApi.logout();
         } else {
             navigate(currentMode === 'EMPLOYEE' ? '/app' : '/patient/onboarding', { replace: true });
         }

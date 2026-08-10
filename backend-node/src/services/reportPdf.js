@@ -266,6 +266,21 @@ const ClinicalReportDocument = ({ report, moodLogs }) => {
     /* @__PURE__ */ React.createElement(Section, { title: "Cognitive Rigidity & Focus" }, /* @__PURE__ */ React.createElement(DiagnosisBox, { title: "Performance Analysis", text: report.aiBrief?.cognitive_rigidity_focus || "Focus markers indicate stable executive switching." })),
     /* @__PURE__ */ React.createElement(Section, { title: "Clinical Protocol (Guardian Instructions)" }, /* @__PURE__ */ React.createElement(View, { style: styles.protocolCard }, /* @__PURE__ */ React.createElement(Text, { style: styles.protocolText }, report.aiBrief?.guardian_protocol || report.aiBrief?.actionable_protocol || "Monitor patient for signs of fatigue and provide hydration."))),
     /* @__PURE__ */ React.createElement(Section, { title: "Protective Factors" }, /* @__PURE__ */ React.createElement(DiagnosisBox, { title: "Patient Strengths", text: report.aiBrief?.patient_strengths || "Protective factors were not available in this report." })),
+    /* Behavioral Telemetry */
+    (report.gameSessions && report.gameSessions.length > 0) ? /* @__PURE__ */ React.createElement(Section, { title: "Behavioral Telemetry (Clinical Tasks)" }, 
+      report.gameSessions.map((game, i) => /* @__PURE__ */ React.createElement(View, { key: i, style: { marginBottom: 8, padding: 8, backgroundColor: "#f8fafc", borderRadius: 6, borderLeft: 3, borderLeftColor: colors.primary, borderWidth: 1, borderColor: colors.border } },
+        /* @__PURE__ */ React.createElement(View, { style: { flexDirection: "row", justifyContent: "space-between", marginBottom: 4 } },
+          /* @__PURE__ */ React.createElement(Text, { style: { fontSize: 10, fontWeight: 700, color: colors.primary } }, game.gameName || game.gameId || "Task"),
+          /* @__PURE__ */ React.createElement(Text, { style: { fontSize: 9, color: colors.muted } }, `Duration: ${game.durationSeconds}s | Acc: ${game.accuracy}%`)
+        ),
+        /* @__PURE__ */ React.createElement(View, { style: { flexDirection: "row", flexWrap: "wrap", marginBottom: 4 } },
+          /* @__PURE__ */ React.createElement(Text, { style: { fontSize: 9, color: colors.secondary, marginRight: 10 } }, `Avg Latency: ${game.avgReactionMs}ms`),
+          /* @__PURE__ */ React.createElement(Text, { style: { fontSize: 9, color: game.maxPauseMs > 3000 ? colors.risk["acute-distress"] : colors.secondary, marginRight: 10 } }, `Max Hesitation: ${game.maxPauseMs}ms`),
+          /* @__PURE__ */ React.createElement(Text, { style: { fontSize: 9, color: game.rapidMoves > 3 ? colors.risk["pre-burnout"] : colors.secondary } }, `Rapid Moves: ${game.rapidMoves}`)
+        ),
+        /* @__PURE__ */ React.createElement(Text, { style: { fontSize: 9, color: colors.text, marginTop: 4, fontStyle: "italic", lineHeight: 1.4 } }, game.predictedEffects?.clinicalNote || "No clinical note generated.")
+      ))
+    ) : null,
     /* Mood Logs Table */
     (moodLogs && moodLogs.length > 0) ? /* @__PURE__ */ React.createElement(Section, { title: "Daily Mood Check-In Log (Last " + moodLogs.length + " entries)" },
       /* @__PURE__ */ React.createElement(View, { style: styles.moodTable },

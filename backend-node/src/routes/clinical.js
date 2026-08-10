@@ -13,11 +13,18 @@ import {
   downloadSessionReportPdfHandler,
   generateRecoveryProtocolHandler,
   logGameSessionHandler,
+  syncOrb,
+  chatOrb,
+  generateStoryHandler
 } from '../controllers/clinicalCtrl.js';
-import { voiceTriageHandler } from '../controllers/voiceTriageCtrl.js';
+import { voiceTriageHandler, transcribeAudioHandler } from '../controllers/voiceTriageCtrl.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
+import multer from 'multer';
 
+const upload = multer({ storage: multer.memoryStorage() });
 const router = express.Router();
+
+router.get('/generate-story', requireAuth, asyncHandler(generateStoryHandler));
 
 // Panic trigger from TaskShatter (most critical — fast path)
 router.post('/trigger-alert', requireAuth, asyncHandler(triggerAlertHandler));
@@ -27,6 +34,9 @@ router.post('/vocal-stress', requireAuth, asyncHandler(logVocalStressHandler));
 
 // New Aura Voice Semantic Triage
 router.post('/voice-triage', requireAuth, asyncHandler(voiceTriageHandler));
+
+// Native Audio Transcription
+router.post('/transcribe', requireAuth, upload.single('audio'), asyncHandler(transcribeAudioHandler));
 
 // Game session telemetry logging
 router.post('/game-session', requireAuth, asyncHandler(logGameSessionHandler));
@@ -51,5 +61,9 @@ router.get('/session-report/:reportId/pdf', requireAuth, asyncHandler(downloadSe
 
 // Recovery Protocol generation
 router.post('/recovery-protocol', requireAuth, asyncHandler(generateRecoveryProtocolHandler));
+
+// Companion Orb Sync
+router.post('/orb-sync', requireAuth, asyncHandler(syncOrb));
+router.post('/orb-chat', requireAuth, asyncHandler(chatOrb));
 
 export default router;
