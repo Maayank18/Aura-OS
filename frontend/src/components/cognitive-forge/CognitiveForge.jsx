@@ -1520,6 +1520,7 @@ function FocusStoryMode({ onSessionEnd }) {
   const [correct, setCorrect] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const startRef = useRef(null);
+  const sessionSeed = useRef(Math.floor(Math.random() * 9999999)).current;
 
   useEffect(() => {
     let mounted = true;
@@ -1596,7 +1597,7 @@ function FocusStoryMode({ onSessionEnd }) {
 
   const scene = story.scenes[sceneIndex];
   const imageUrl = scene && scene.image_prompt && scene.type !== 'quiz'
-    ? `https://image.pollinations.ai/prompt/${encodeURIComponent(scene.image_prompt + ' cinematic highly detailed wallpaper')}?width=800&height=500&nologo=true&seed=${Math.floor(Math.random() * 9999999)}`
+    ? `https://image.pollinations.ai/prompt/${encodeURIComponent(scene.image_prompt + ' cinematic highly detailed wallpaper')}?width=800&height=500&nologo=true&seed=${sessionSeed + sceneIndex}`
     : null;
 
   return (

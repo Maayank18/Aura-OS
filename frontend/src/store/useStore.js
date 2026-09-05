@@ -244,9 +244,16 @@ const useStore = create((set, get) => ({
                      : 'calm',
           auraResponse: result.data.groundingResponse
         });
+      } else {
+        set({ auraResponse: "I'm having trouble processing that right now, but I'm still here with you." });
       }
     } catch (error) {
       console.error("Voice triage telemetry failed:", error);
+      set({ 
+        auraResponse: error.message === 'Authentication required.' 
+          ? "Please log in to use voice processing." 
+          : "I'm having a connection issue right now, but please take a deep breath. I'm here." 
+      });
     }
   },
 }));

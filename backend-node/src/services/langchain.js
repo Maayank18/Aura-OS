@@ -78,7 +78,7 @@ const StoryGenerationSchema = z.object({
   })).length(7)
 });
 
-const makeModel = (schema, name, temp = 0.38) => {
+const makeModel = (schema, name, temp = 0.38, modelOverride = null, maxTokensOverride = null) => {
   try {
     const openRouterKeys = [
       process.env.OPENROUTER_API_KEY,
@@ -92,11 +92,11 @@ const makeModel = (schema, name, temp = 0.38) => {
     if (!useOpenRouter && !groqKey) throw new Error('API_KEY is not set.');
     
     const createLLM = (key) => new ChatOpenAI({
-      modelName: useOpenRouter ? (process.env.OPENROUTER_MODEL || 'openai/gpt-4o-mini') : (process.env.GROQ_MODEL || 'llama-3.1-8b-instant'),
+      modelName: useOpenRouter ? (modelOverride || process.env.OPENROUTER_MODEL || 'openai/gpt-4o-mini') : (process.env.GROQ_MODEL || 'llama-3.1-8b-instant'),
       temperature: temp,
       apiKey: key,
       maxRetries: 2,
-      maxTokens: 1200,
+      maxTokens: maxTokensOverride || 1200,
       configuration: {
         baseURL: useOpenRouter ? 'https://openrouter.ai/api/v1' : 'https://api.groq.com/openai/v1',
         defaultHeaders: useOpenRouter ? {
@@ -261,7 +261,7 @@ Return ONLY a valid JSON object with EXACTLY this structure:
 }`;
 
 export const breakdownTask = async (task) => {
-  const model = makeModel(MicroQuestSchema, 'generate_microquests');
+  const model = makeModel(MicroQuestSchema, 'generate_microquests', 0.6, 'openai/gpt-4o-mini', 350);
   if (!model) return fallbackMicroquests(task);
 
   console.log(`[LangChain-OpenRouter] Standard breakdown...`);
@@ -278,7 +278,7 @@ export const breakdownTask = async (task) => {
 };
 
 export const coachBreakdown = async (task, blocker) => {
-  const model = makeModel(InitiationCoachSchema, 'initiation_coach');
+  const model = makeModel(InitiationCoachSchema, 'initiation_coach', 0.6, 'openai/gpt-4o-mini', 400);
   const fallback = () => ({
     coach_message: 'I will keep this concrete and small so you can start without extra planning.',
     environment_strategy: blocker === 'too_noisy' ? 'brown_noise' : blocker === 'brain_fog' ? 'deep_focus_dark' : 'none',
@@ -434,7 +434,7 @@ AURA INTERVENTION: ${safe(data.auraAction, 'Somatic interruption deployed.')}
 };
 
 export const generateOrbSync = async (data) => {
-  const model = makeModel(OrbSyncSchema, 'orb_sync', 0.5);
+  const model = makeModel(OrbSyncSchema, 'orb_sync', 0.5, 'openai/gpt-4o-mini', 150);
   const fallback = { message: "I'm here if you need me.", mode: 'gentle' };
   
   if (!model) return fallback;
@@ -459,13 +459,15 @@ RECENT EVENT: ${data.recentEvent || 'None'}
 };
 
 export const generateOrbChat = async (message, history, context) => {
-  const model = makeModel(OrbChatSchema, 'orb_chat', 0.6);
+  const model = makeModel(OrbChatSchema, 'orb_chat', 0.6, 'openai/gpt-4o-mini', 300);
   const fallback = { reply: "I'm having trouble connecting right now, but I'm still here." };
   
   if (!model) return fallback;
 
   try {
-    const formattedHistory = history.map(msg => 
+    // Truncate history to prevent token explosion (keep last 6 messages / 3 conversational turns)
+    const truncatedHistory = history.slice(-6);
+    const formattedHistory = truncatedHistory.map(msg => 
       msg.role === 'user' ? new HumanMessage(msg.text) : new SystemMessage(msg.text)
     );
     
@@ -512,7 +514,7 @@ Respond ONLY with a JSON object in this exact format:
 `;
 
 export const generateFocusStory = async () => {
-  const model = makeModel(StoryGenerationSchema, 'focus_story', 0.85);
+  const model = makeModel(StoryGenerationSchema, 'focus_story', 0.85, 'openai/gpt-4o-2024-08-06', 1200);
   if (!model) throw new Error('LLM not configured.');
 
   try {

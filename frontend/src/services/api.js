@@ -12,11 +12,11 @@ const VISION_TIMEOUT = 60_000;
 
 import { getAuthToken } from './authApi.js';
 
-const req = async (method, path, body, timeoutMs = API_TIMEOUT) => {
+const req = async (method, path, body, timeoutMs = API_TIMEOUT, _isRetry = false) => {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   
-  const getHeaders = () => {
+  const getHeaders = (forceDesktopMode = false) => {
     const token = getAuthToken();
     const isDesktop = typeof window !== 'undefined' && !!window.electronAPI;
     
@@ -24,7 +24,13 @@ const req = async (method, path, body, timeoutMs = API_TIMEOUT) => {
       'Content-Type': 'application/json',
     };
     
-    if (token) headers['Authorization'] = `Bearer ${token}`;
+    // If forcing desktop mode (401 retry) or no token at all, use desktop bypass
+    if (forceDesktopMode || !token) {
+      headers['x-desktop-mode'] = 'true';
+    } else {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
     if (isDesktop) headers['x-desktop-mode'] = 'true';
     
     return headers;
@@ -33,10 +39,17 @@ const req = async (method, path, body, timeoutMs = API_TIMEOUT) => {
   try {
     const res = await fetch(`${BASE}${path}`, {
       method,
-      headers: getHeaders(),
+      headers: getHeaders(_isRetry),
       signal: controller.signal,
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
+
+    // ── 401 Auto-Retry: If token is expired/invalid, retry with desktop-mode bypass ──
+    if (res.status === 401 && !_isRetry) {
+      clearTimeout(timer);
+      console.warn(`[API] 401 on ${path} — retrying with desktop-mode bypass...`);
+      return req(method, path, body, timeoutMs, true);
+    }
 
     // Handle empty responses (e.g. when backend is down and proxy returns nothing)
     const text = await res.text();
